@@ -572,6 +572,94 @@
     text-align:center;
   }
   .finale-history.hidden{display:none;}
+
+  /* ---------- My Lineup / Starting 5 ---------- */
+  .lineup-total{
+    text-align:center;
+    background:rgba(201,160,77,0.06);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:18px;
+    margin-bottom:22px;
+  }
+  .lineup-total-label{
+    font-size:10px;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    color:var(--brass);
+    margin:0 0 8px;
+  }
+  .lineup-total-value{
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:clamp(30px,5vw,44px);
+    color:var(--brass-bright);
+    margin:0;
+    font-variant-numeric:tabular-nums;
+  }
+  .lineup-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+    gap:14px;
+    margin-bottom:26px;
+  }
+  .lineup-card{
+    background:linear-gradient(160deg,var(--vault-green-2),var(--vault-black));
+    border:1px solid var(--brass);
+    border-radius:8px;
+    padding:18px 14px;
+    text-align:center;
+  }
+  .lineup-rank{
+    font-size:11px;
+    letter-spacing:0.15em;
+    color:var(--brass);
+    margin:0 0 6px;
+  }
+  .lineup-value{
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:22px;
+    color:var(--brass-bright);
+    margin:0 0 4px;
+  }
+  .lineup-player{
+    font-family:'Fraunces',serif;
+    font-style:italic;
+    font-weight:600;
+    font-size:14px;
+    color:var(--cream);
+    margin:0 0 6px;
+  }
+  .lineup-accolade{
+    font-size:10.5px;
+    color:var(--cream-dim);
+    margin:0 0 8px;
+    line-height:1.4;
+  }
+  .lineup-tag{
+    display:inline-block;
+    font-size:9.5px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--vault-black);
+    background:var(--brass);
+    border-radius:3px;
+    padding:2px 8px;
+    margin:0;
+  }
+  .lineup-history-heading{
+    font-size:10px;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    color:var(--brass);
+    margin:0 0 12px;
+  }
+  .lineup-history-list{
+    max-height:260px;
+    overflow-y:auto;
+    margin-bottom:20px;
+  }
   @media (prefers-reduced-motion:reduce){
     .finale-overlay{animation:none;}
     .finale-overlay .hero-reveal:nth-child(2){animation-delay:0s;}
@@ -839,6 +927,35 @@ const PLAYER_ACCOLADES = {
 
 function getAccolade(name){
   return PLAYER_ACCOLADES[name] || '';
+}
+
+/* ---------------------------------------------------------------
+   SAVED LINEUP — local, per-browser history of results, used to
+   build a "Starting 5" of the player's best pulls over time.
+   Lives in localStorage since there's no player login system;
+   this is a real standalone site (not a Claude artifact), so
+   localStorage is safe and appropriate to use here.
+------------------------------------------------------------------*/
+const LINEUP_STORAGE_KEY = 'vault_saved_results_v1';
+
+function getSavedResults(){
+  try{
+    const raw = localStorage.getItem(LINEUP_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch(e){ return []; }
+}
+
+function saveResultToLineup(entry){
+  try{
+    const results = getSavedResults();
+    results.push({ ...entry, savedAt: new Date().toISOString() });
+    localStorage.setItem(LINEUP_STORAGE_KEY, JSON.stringify(results));
+  } catch(e){ /* localStorage unavailable (private browsing, etc.) — silently skip */ }
+}
+
+function getStartingFive(){
+  return getSavedResults().slice().sort((a, b) => b.value - a.value).slice(0, 5);
 }
 
 /* ---------------------------------------------------------------
@@ -1275,6 +1392,7 @@ function render(){
   renderBoard();
   renderLadder();
   renderFinalPanel();
+  renderLineupPanel();
 }
 
 function renderHeaderActions(){
@@ -1305,7 +1423,7 @@ function renderHeaderActions(){
 
 function renderStatusStrip(){
   const el = document.getElementById('statusStrip');
-  if(state.phase === 'setup'){ el.style.display='none'; return; }
+  if(state.phase === 'setup' || state.phase === 'lineup'){ el.style.display='none'; return; }
   el.style.display='flex';
 
   const remaining = state.cases.filter(c=>!c.opened && c.num !== state.heldCaseNum).length;
@@ -1339,7 +1457,7 @@ function renderStatusStrip(){
 function renderBoard(){
   const el = document.getElementById('board');
   const gameArea = document.getElementById('gameArea');
-  if(state.phase === 'setup'){ el.innerHTML=''; gameArea.style.display='none'; return; }
+  if(state.phase === 'setup' || state.phase === 'lineup'){ el.innerHTML=''; gameArea.style.display='none'; return; }
   gameArea.style.display='flex';
 
   el.innerHTML = '';
@@ -1474,6 +1592,7 @@ function renderSetupPanel(){
       <div class="panel-actions">
         <button class="primary" id="startGameBtn">Start game</button>
         <button id="soundToggleBtn">${state.soundEnabled ? '🔊 Sound: On' : '🔇 Sound: Off'}</button>
+        <button id="viewLineupBtn">My Lineup${getSavedResults().length ? ` (${getSavedResults().length})` : ''}</button>
       </div>
     </div>
   `;
@@ -1520,6 +1639,7 @@ function renderSetupPanel(){
     if(state.soundEnabled) playSound('caseClick'); // quick confirmation blip + unlocks audio for this session
     renderSetupPanel();
   };
+  document.getElementById('viewLineupBtn').onclick = () => { state.phase = 'lineup'; render(); };
 
   if(state.presetIndex !== null){
     document.getElementById('loadPresetBtn').onclick = () => {
@@ -1641,6 +1761,12 @@ function renderFinalPanel(){
     lastOpen.opened = true;
     playSound('revealSting');
     celebrateIfBig(held.value);
+    saveResultToLineup({
+      player: held.player,
+      value: held.value,
+      accolade: getAccolade(held.player),
+      wasDeal: false
+    });
     renderLadder();
 
     const overlay = document.getElementById('finaleOverlay');
@@ -1705,7 +1831,68 @@ function renderFinalPanel(){
   };
 }
 
-/* ---------------------------------------------------------------
+function renderLineupPanel(){
+  const el = document.getElementById('finalPanel');
+  if(state.phase !== 'lineup') return; // don't clear finalPanel here — renderFinalPanel already owns that for other phases
+  const all = getSavedResults();
+  const five = getStartingFive();
+  const total = five.reduce((sum, r) => sum + r.value, 0);
+
+  if(!all.length){
+    el.innerHTML = `
+      <div class="panel">
+        <h2>My Lineup</h2>
+        <p>No results saved yet — play a full round and your outcome (deal or final case) automatically gets added here.</p>
+        <div class="panel-actions">
+          <button class="primary" id="backFromLineupBtn">Back</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('backFromLineupBtn').onclick = () => { state.phase = 'setup'; render(); };
+    return;
+  }
+
+  const fiveCardsHtml = five.map((r, i) => `
+    <div class="lineup-card">
+      <p class="lineup-rank">#${i+1}</p>
+      <p class="lineup-value">${fmt(r.value)}</p>
+      <p class="lineup-player">${r.player}</p>
+      ${r.accolade ? `<p class="lineup-accolade">${r.accolade}</p>` : ''}
+      ${r.wasDeal ? `<p class="lineup-tag">Deal</p>` : `<p class="lineup-tag">Final Case</p>`}
+    </div>
+  `).join('');
+
+  const historyRowsHtml = all.slice().reverse().map(r => `
+    <li>
+      <span>${r.player}${r.wasDeal ? ' (deal)' : ''}</span>
+      <strong>${fmt(r.value)}</strong>
+    </li>
+  `).join('');
+
+  el.innerHTML = `
+    <div class="panel">
+      <h2>My Lineup</h2>
+      <p>Your Starting 5 — the highest-value results you've earned across every game played on this device.</p>
+      <div class="lineup-total">
+        <p class="lineup-total-label">Starting 5 Combined Value</p>
+        <p class="lineup-total-value">${fmt(total)}</p>
+      </div>
+      <div class="lineup-grid">${fiveCardsHtml}</div>
+      <h3 class="lineup-history-heading">All results (${all.length})</h3>
+      <ul class="history-list lineup-history-list">${historyRowsHtml}</ul>
+      <div class="panel-actions">
+        <button class="primary" id="backFromLineupBtn">Back</button>
+        <button class="ghost-ember" id="clearLineupBtn">Clear my lineup</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('backFromLineupBtn').onclick = () => { state.phase = 'setup'; render(); };
+  document.getElementById('clearLineupBtn').onclick = () => {
+    try{ localStorage.removeItem(LINEUP_STORAGE_KEY); } catch(e){}
+    render();
+  };
+}
+
    GAME LOGIC
 ------------------------------------------------------------------*/
 function startGame(board){
@@ -1803,6 +1990,15 @@ function takeDeal(){
   render();
   openDealOverlay();
   celebrateIfBig(state.dealAcceptedValue);
+  const closestForLineup = findClosestPlayerByValue(state.cases, state.dealAcceptedValue);
+  if(closestForLineup){
+    saveResultToLineup({
+      player: closestForLineup.player,
+      value: state.dealAcceptedValue,
+      accolade: getAccolade(closestForLineup.player),
+      wasDeal: true
+    });
+  }
 }
 
 function openDealOverlay(){
