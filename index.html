@@ -345,6 +345,38 @@
   .preset-hint{font-size:11.5px;color:var(--cream-dim);margin:0;}
   .preset-status{font-size:11.5px;color:var(--brass-bright);margin:8px 0 0;min-height:14px;}
 
+  /* ---------- Daily Challenge ---------- */
+  .daily-block{
+    background:linear-gradient(120deg, rgba(201,160,77,0.10), rgba(201,160,77,0.03));
+  }
+  .daily-row{
+    display:flex;
+    align-items:center;
+    gap:20px;
+    flex-wrap:wrap;
+  }
+  .daily-streak{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    min-width:76px;
+  }
+  .daily-streak-value{
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:34px;
+    color:var(--brass-bright);
+    margin:0;
+    line-height:1;
+  }
+  .daily-streak-label{
+    font-size:10px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--cream-dim);
+    margin:4px 0 0;
+  }
+
   /* ---------- Banker ringing ---------- */
   .ring-stage{display:flex;flex-direction:column;align-items:flex-start;gap:18px;padding:10px 0 4px;}
 
@@ -855,6 +887,7 @@ let state = {
   selectedPreset: '',
   soundEnabled: false,
   currentSport: 'NBA', // updated whenever a preset loads; DEFAULT_BOARD is NBA
+  isDailyMode: false,
 };
 
 function fmt(n){ return '$' + n.toLocaleString('en-US'); }
@@ -956,6 +989,93 @@ const DEFAULT_LINEUP_SIZE = 5;
 
 function getLineupSize(sport){
   return SPORT_LINEUP_SIZES[(sport || 'NBA').toUpperCase()] || DEFAULT_LINEUP_SIZE;
+}
+
+/* ---------------------------------------------------------------
+   DAILY CHALLENGE
+   One shared board per calendar day, deterministically picked from
+   whatever presets exist in Supabase (rotates automatically as more
+   get added — no manual admin step needed). Case-to-number placement
+   is still independently shuffled per person via the normal
+   buildCasesFromBoard() shuffle, so no strategic info leaks between
+   people comparing results — only the underlying board content
+   (which dollar values map to which players) is shared, and that's
+   already visible to everyone via the value ladder regardless.
+
+   Once-per-day gating and the streak counter live in localStorage,
+   same rationale as the lineup system — no player login exists.
+------------------------------------------------------------------*/
+function getTodayDateString(){
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD, UTC
+}
+
+function getYesterdayDateString(){
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function hashDateToIndex(dateStr, modulus){
+  if(modulus <= 0) return 0;
+  let hash = 0;
+  for(let i = 0; i < dateStr.length; i++){
+    hash = (hash * 31 + dateStr.charCodeAt(i)) >>> 0;
+  }
+  return hash % modulus;
+}
+
+function getDailyState(){
+  try{
+    return {
+      startedDate: localStorage.getItem('vault_daily_started_date'),
+      streak: parseInt(localStorage.getItem('vault_daily_streak') || '0', 10),
+      lastCompletedDate: localStorage.getItem('vault_daily_last_completed_date'),
+    };
+  } catch(e){
+    return { startedDate: null, streak: 0, lastCompletedDate: null };
+  }
+}
+
+function markDailyStarted(){
+  try{ localStorage.setItem('vault_daily_started_date', getTodayDateString()); } catch(e){}
+}
+
+function markDailyCompleted(){
+  try{
+    const today = getTodayDateString();
+    const ds = getDailyState();
+    if(ds.lastCompletedDate === today) return; // already counted today, don't double-increment
+    const streak = ds.lastCompletedDate === getYesterdayDateString() ? ds.streak + 1 : 1;
+    localStorage.setItem('vault_daily_streak', String(streak));
+    localStorage.setItem('vault_daily_last_completed_date', today);
+  } catch(e){}
+}
+
+async function loadTodaysDailyBoard(){
+  if(!state.presetIndex || !state.presetIndex.length) return null;
+  const sortedNames = state.presetIndex.slice().sort();
+  const idx = hashDateToIndex(getTodayDateString(), sortedNames.length);
+  const presetName = sortedNames[idx];
+  try{
+    const { data, error } = await sb.from('vault_presets').select('board, sport').eq('name', presetName).single();
+    if(error) throw error;
+    return { board: data.board.map(c => ({...c})), sport: data.sport || 'NBA', presetName };
+  } catch(e){
+    return null;
+  }
+}
+
+async function startDailyChallenge(){
+  const daily = await loadTodaysDailyBoard();
+  if(!daily){
+    state.presetStatus = 'Could not load today\'s challenge — try again in a moment.';
+    renderSetupPanel();
+    return;
+  }
+  state.currentSport = daily.sport;
+  markDailyStarted();
+  startGame(daily.board);
+  state.isDailyMode = true; // set after startGame(), which resets other per-game flags
 }
 
 function lineupLabel(sport){
@@ -1470,6 +1590,11 @@ function renderStatusStrip(){
     Math.max(0, ROUND_SCHEDULE[state.roundIndex] - state.casesOpenedThisRound) : 0;
 
   el.innerHTML = `
+    ${state.isDailyMode ? `
+    <div class="status-block">
+      <span class="status-label">Mode</span>
+      <span class="status-value" style="color:var(--brass-bright);">🔥 Daily Challenge</span>
+    </div>` : ''}
     <div class="status-block">
       <span class="status-label">Status</span>
       <span class="status-value">${roundLabel}</span>
@@ -1553,6 +1678,26 @@ function renderSetupPanel(){
 
   const isAdmin = !!currentUser;
 
+  const dailyState = getDailyState();
+  const playedToday = dailyState.startedDate === getTodayDateString();
+  const dailyReady = state.presetIndex !== null && state.presetIndex.length > 0;
+  const dailyBlockHtml = `
+    <div class="preset-block daily-block">
+      <h3>Daily Challenge</h3>
+      <p class="preset-hint" style="margin-bottom:12px;">One shared board for everyone today — your case order is still your own. Come back daily to build a streak.</p>
+      <div class="daily-row">
+        <div class="daily-streak">
+          <p class="daily-streak-value">${dailyState.streak}</p>
+          <p class="daily-streak-label">day streak</p>
+        </div>
+        ${playedToday
+          ? `<button disabled id="dailyPlayedBtn">Come back tomorrow</button>`
+          : `<button class="primary" id="dailyChallengeBtn" ${dailyReady ? '' : 'disabled'}>Play Today's Challenge</button>`
+        }
+      </div>
+    </div>
+  `;
+
   const presetOptionsHtml = (state.presetIndex || []).map(name =>
     `<option value="${name}" ${name===state.selectedPreset ? 'selected':''}>${name}</option>`
   ).join('');
@@ -1622,6 +1767,7 @@ function renderSetupPanel(){
     <div class="panel">
       <h2>Set the board</h2>
       <p class="how-to-play">Pick a case, then decide: take the banker's offer, or risk it for what's inside.</p>
+      ${dailyBlockHtml}
       <p>${isAdmin
         ? 'Edit any player or value below — changes apply the moment you start. Case order is shuffled fresh every game, so the numbers never map to this list.'
         : 'Pick a saved board below, or just start with the default.'}</p>
@@ -1673,6 +1819,8 @@ function renderSetupPanel(){
   }
 
   document.getElementById('startGameBtn').onclick = () => startGame(state.editBoard);
+  const dailyBtn = document.getElementById('dailyChallengeBtn');
+  if(dailyBtn) dailyBtn.onclick = () => startDailyChallenge();
   document.getElementById('soundToggleBtn').onclick = () => {
     state.soundEnabled = !state.soundEnabled;
     if(state.soundEnabled) playSound('caseClick'); // quick confirmation blip + unlocks audio for this session
@@ -1807,6 +1955,7 @@ function renderFinalPanel(){
       accolade: getAccolade(held.player),
       wasDeal: false
     }, state.currentSport);
+    if(state.isDailyMode) markDailyCompleted();
     renderLadder();
 
     const overlay = document.getElementById('finaleOverlay');
@@ -1941,6 +2090,7 @@ function startGame(board){
   state.declinedOffers = [];
   state.pendingOfferCases = null;
   state.lastOpenedCase = null;
+  state.isDailyMode = false; // only startDailyChallenge() sets this true, right after calling this
   state.phase = 'pick';
   render();
   logPlay();
@@ -2033,6 +2183,7 @@ function takeDeal(){
       wasDeal: true
     }, state.currentSport);
   }
+  if(state.isDailyMode) markDailyCompleted();
 }
 
 function openDealOverlay(){
