@@ -1011,27 +1011,6 @@ function canvasToBlob(canvas){
   return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
 }
 
-async function downloadResultImage(payload, btnEl){
-  const originalLabel = btnEl.textContent;
-  btnEl.textContent = 'Generating…';
-  try{
-    const canvas = await generateResultImage(payload);
-    const blob = await canvasToBlob(canvas);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'the-vault-result.png';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    btnEl.textContent = 'Downloaded!';
-  } catch(e){
-    btnEl.textContent = 'Could not generate';
-  }
-  setTimeout(() => { btnEl.textContent = originalLabel; }, 2000);
-}
-
 async function shareResultImage(payload, text, btnEl){
   const originalLabel = btnEl.textContent;
   try{
@@ -1493,7 +1472,6 @@ function renderFinalPanel(){
       <div class="panel-actions" style="justify-content:center;">
         <button class="primary" id="playAgainBtn2">Play again</button>
         ${state.declinedOffers.length ? '<button id="viewHistoryBtn2">View offer history</button>' : ''}
-        <button id="downloadImgBtn2">Download image</button>
         <button id="shareResultBtn2" ${navigator.share ? '' : 'style="display:none;"'}>Share</button>
         <button id="copyResultBtn2">Copy result</button>
       </div>
@@ -1516,7 +1494,6 @@ function renderFinalPanel(){
         e.target.textContent = hist.classList.contains('hidden') ? 'View offer history' : 'Hide offer history';
       };
     }
-    document.getElementById('downloadImgBtn2').onclick = (e) => downloadResultImage(imagePayload, e.target);
     document.getElementById('shareResultBtn2').onclick = (e) => shareResultImage(imagePayload, shareText, e.target);
     document.getElementById('copyResultBtn2').onclick = (e) => doCopy(shareText, e.target);
   };
@@ -1626,7 +1603,6 @@ function openDealOverlay(){
     <div class="panel-actions" style="justify-content:center;">
       <button id="revealHeldBtnOverlay">Reveal your case anyway</button>
       ${state.declinedOffers.length ? '<button id="viewHistoryBtnOverlay">View offer history</button>' : ''}
-      <button id="downloadImgBtnOverlay">Download image</button>
       <button id="shareResultBtnOverlay" ${navigator.share ? '' : 'style="display:none;"'}>Share</button>
       <button id="copyResultBtnOverlay">Copy result</button>
       <button class="primary" id="playAgainBtnOverlay">Play again</button>
@@ -1644,7 +1620,6 @@ function openDealOverlay(){
     overlay.classList.add('hidden');
     startGame(state.editBoard);
   };
-  document.getElementById('downloadImgBtnOverlay').onclick = (e) => downloadResultImage(imagePayload, e.target);
   document.getElementById('shareResultBtnOverlay').onclick = (e) => shareResultImage(imagePayload, dealtShareText, e.target);
   document.getElementById('copyResultBtnOverlay').onclick = (e) => doCopy(dealtShareText, e.target);
   if(state.declinedOffers.length){
