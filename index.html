@@ -1283,8 +1283,8 @@ async function loadPresetIndex(){
   // Auto-load NBA Standard as the default board on first visit, so the
   // dropdown reflects reality and the site always uses whatever the current
   // live version of that board is — not a frozen copy baked into the code.
-  if(!state.presetLoadError && state.presetIndex.includes('NBA Standard') && state.selectedPreset === ''){
-    await loadPresetByName('NBA Standard');
+  if(!state.presetLoadError && state.presetIndex.includes('NBA – Standard') && state.selectedPreset === ''){
+    await loadPresetByName('NBA – Standard');
     state.presetStatus = ''; // silent default load, not a user-triggered action
     renderSetupPanel();
   }
