@@ -946,16 +946,24 @@ function getSavedResults(){
   } catch(e){ return []; }
 }
 
+const LINEUP_MAX_SIZE = 5;
+
 function saveResultToLineup(entry){
   try{
-    const results = getSavedResults();
+    let results = getSavedResults();
     results.push({ ...entry, savedAt: new Date().toISOString() });
+    // Keep only the 5 best results ever — a new result knocks out the
+    // weakest one if the lineup is already full, rather than growing
+    // an unbounded history.
+    results = results.sort((a, b) => b.value - a.value).slice(0, LINEUP_MAX_SIZE);
     localStorage.setItem(LINEUP_STORAGE_KEY, JSON.stringify(results));
   } catch(e){ /* localStorage unavailable (private browsing, etc.) — silently skip */ }
 }
 
 function getStartingFive(){
-  return getSavedResults().slice().sort((a, b) => b.value - a.value).slice(0, 5);
+  // getSavedResults() is already capped at 5 and effectively the "lineup"
+  // itself now, but re-sort defensively in case of any legacy data.
+  return getSavedResults().slice().sort((a, b) => b.value - a.value);
 }
 
 /* ---------------------------------------------------------------
@@ -1834,15 +1842,14 @@ function renderFinalPanel(){
 function renderLineupPanel(){
   const el = document.getElementById('finalPanel');
   if(state.phase !== 'lineup') return; // don't clear finalPanel here — renderFinalPanel already owns that for other phases
-  const all = getSavedResults();
   const five = getStartingFive();
   const total = five.reduce((sum, r) => sum + r.value, 0);
 
-  if(!all.length){
+  if(!five.length){
     el.innerHTML = `
       <div class="panel">
         <h2>My Lineup</h2>
-        <p>No results saved yet — play a full round and your outcome (deal or final case) automatically gets added here.</p>
+        <p>No results saved yet — play a full round and your outcome (deal or final case) automatically gets added here. Your best 5 results ever stay saved.</p>
         <div class="panel-actions">
           <button class="primary" id="backFromLineupBtn">Back</button>
         </div>
@@ -1862,24 +1869,15 @@ function renderLineupPanel(){
     </div>
   `).join('');
 
-  const historyRowsHtml = all.slice().reverse().map(r => `
-    <li>
-      <span>${r.player}${r.wasDeal ? ' (deal)' : ''}</span>
-      <strong>${fmt(r.value)}</strong>
-    </li>
-  `).join('');
-
   el.innerHTML = `
     <div class="panel">
       <h2>My Lineup</h2>
-      <p>Your Starting 5 — the highest-value results you've earned across every game played on this device.</p>
+      <p>Your Starting 5 — the ${LINEUP_MAX_SIZE} best results you've ever earned on this device. A new result bumps out the weakest one automatically.</p>
       <div class="lineup-total">
         <p class="lineup-total-label">Starting 5 Combined Value</p>
         <p class="lineup-total-value">${fmt(total)}</p>
       </div>
       <div class="lineup-grid">${fiveCardsHtml}</div>
-      <h3 class="lineup-history-heading">All results (${all.length})</h3>
-      <ul class="history-list lineup-history-list">${historyRowsHtml}</ul>
       <div class="panel-actions">
         <button class="primary" id="backFromLineupBtn">Back</button>
         <button class="ghost-ember" id="clearLineupBtn">Clear my lineup</button>
