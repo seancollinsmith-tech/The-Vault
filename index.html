@@ -854,6 +854,7 @@ let state = {
   presetStatus: '',
   selectedPreset: '',
   soundEnabled: false,
+  currentSport: 'NBA', // updated whenever a preset loads; DEFAULT_BOARD is NBA
 };
 
 function fmt(n){ return '$' + n.toLocaleString('en-US'); }
@@ -931,39 +932,64 @@ function getAccolade(name){
 
 /* ---------------------------------------------------------------
    SAVED LINEUP — local, per-browser history of results, used to
-   build a "Starting 5" of the player's best pulls over time.
+   build a "starting lineup" of the player's best pulls over time.
    Lives in localStorage since there's no player login system;
    this is a real standalone site (not a Claude artifact), so
    localStorage is safe and appropriate to use here.
-------------------------------------------------------------------*/
-const LINEUP_STORAGE_KEY = 'vault_saved_results_v1';
 
-function getSavedResults(){
+   MULTI-SPORT: every board preset is tagged with a "sport" (see
+   the `sport` column on vault_presets, default 'NBA'). Lineups are
+   stored PER SPORT — a saved NBA result never mixes with a future
+   NFL result — and each sport has its own lineup size (5 for NBA,
+   11 for NFL/soccer, etc.) via SPORT_LINEUP_SIZES below. Add a new
+   sport to that map and everything else here already supports it,
+   no further architecture changes needed.
+------------------------------------------------------------------*/
+const SPORT_LINEUP_SIZES = {
+  NBA: 5,
+  NFL: 11,
+  SOCCER: 11,
+  MLB: 9,
+  NHL: 6,
+};
+const DEFAULT_LINEUP_SIZE = 5;
+
+function getLineupSize(sport){
+  return SPORT_LINEUP_SIZES[(sport || 'NBA').toUpperCase()] || DEFAULT_LINEUP_SIZE;
+}
+
+function lineupLabel(sport){
+  const size = getLineupSize(sport);
+  return `Starting ${size}`;
+}
+
+function lineupStorageKey(sport){
+  return `vault_saved_results_v1__${(sport || 'NBA').toUpperCase()}`;
+}
+
+function getSavedResults(sport){
   try{
-    const raw = localStorage.getItem(LINEUP_STORAGE_KEY);
+    const raw = localStorage.getItem(lineupStorageKey(sport));
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch(e){ return []; }
 }
 
-const LINEUP_MAX_SIZE = 5;
-
-function saveResultToLineup(entry){
+function saveResultToLineup(entry, sport){
   try{
-    let results = getSavedResults();
+    const cap = getLineupSize(sport);
+    let results = getSavedResults(sport);
     results.push({ ...entry, savedAt: new Date().toISOString() });
-    // Keep only the 5 best results ever — a new result knocks out the
-    // weakest one if the lineup is already full, rather than growing
-    // an unbounded history.
-    results = results.sort((a, b) => b.value - a.value).slice(0, LINEUP_MAX_SIZE);
-    localStorage.setItem(LINEUP_STORAGE_KEY, JSON.stringify(results));
+    // Keep only the best `cap` results ever for this sport — a new
+    // result knocks out the weakest one if the lineup is already
+    // full, rather than growing an unbounded history.
+    results = results.sort((a, b) => b.value - a.value).slice(0, cap);
+    localStorage.setItem(lineupStorageKey(sport), JSON.stringify(results));
   } catch(e){ /* localStorage unavailable (private browsing, etc.) — silently skip */ }
 }
 
-function getStartingFive(){
-  // getSavedResults() is already capped at 5 and effectively the "lineup"
-  // itself now, but re-sort defensively in case of any legacy data.
-  return getSavedResults().slice().sort((a, b) => b.value - a.value);
+function getStartingLineup(sport){
+  return getSavedResults(sport).slice().sort((a, b) => b.value - a.value);
 }
 
 /* ---------------------------------------------------------------
@@ -1078,17 +1104,18 @@ async function loadPresetIndex(){
   }
 }
 
-async function savePresetAs(name, board){
+async function savePresetAs(name, board, sport){
   if(!name || !name.trim()) return;
   const clean = name.trim();
   try{
     const { error } = await sb.from('vault_presets')
-      .upsert({ name: clean, board: board, updated_at: new Date().toISOString() });
+      .upsert({ name: clean, board: board, sport: sport || 'NBA', updated_at: new Date().toISOString() });
     if(error) throw error;
     if(!state.presetIndex.includes(clean)){
       state.presetIndex.push(clean);
       state.presetIndex.sort();
     }
+    state.currentSport = sport || 'NBA';
     state.presetStatus = `Saved "${clean}."`;
     state.selectedPreset = clean;
   } catch(e){
@@ -1100,9 +1127,10 @@ async function savePresetAs(name, board){
 async function loadPresetByName(name){
   if(!name) return;
   try{
-    const { data, error } = await sb.from('vault_presets').select('board').eq('name', name).single();
+    const { data, error } = await sb.from('vault_presets').select('board, sport').eq('name', name).single();
     if(error) throw error;
     state.editBoard = data.board.map(c => ({...c}));
+    state.currentSport = data.sport || 'NBA';
     state.presetStatus = `Loaded "${name}."`;
     state.selectedPreset = name;
   } catch(e){
@@ -1545,6 +1573,9 @@ function renderSetupPanel(){
       ${isAdmin ? `
         <div class="preset-row">
           <input type="text" id="presetNameInput" placeholder="Name this board (e.g. Current Stars)">
+          <select id="presetSportInput">
+            ${Object.keys(SPORT_LINEUP_SIZES).map(s => `<option value="${s}" ${s==='NBA'?'selected':''}>${s} (${lineupLabel(s)})</option>`).join('')}
+          </select>
           <button class="primary" id="savePresetBtn">Save current board as new preset</button>
         </div>
       ` : ''}
@@ -1600,7 +1631,7 @@ function renderSetupPanel(){
       <div class="panel-actions">
         <button class="primary" id="startGameBtn">Start game</button>
         <button id="soundToggleBtn">${state.soundEnabled ? '🔊 Sound: On' : '🔇 Sound: Off'}</button>
-        <button id="viewLineupBtn">My Lineup${getSavedResults().length ? ` (${getSavedResults().length})` : ''}</button>
+        <button id="viewLineupBtn">My Lineup${getSavedResults(state.currentSport).length ? ` (${getSavedResults(state.currentSport).length})` : ''}</button>
       </div>
     </div>
   `;
@@ -1661,7 +1692,8 @@ function renderSetupPanel(){
       };
       document.getElementById('savePresetBtn').onclick = () => {
         const nameInput = document.getElementById('presetNameInput');
-        savePresetAs(nameInput.value, state.editBoard);
+        const sportInput = document.getElementById('presetSportInput');
+        savePresetAs(nameInput.value, state.editBoard, sportInput.value);
       };
     }
   }
@@ -1774,7 +1806,7 @@ function renderFinalPanel(){
       value: held.value,
       accolade: getAccolade(held.player),
       wasDeal: false
-    });
+    }, state.currentSport);
     renderLadder();
 
     const overlay = document.getElementById('finaleOverlay');
@@ -1842,14 +1874,17 @@ function renderFinalPanel(){
 function renderLineupPanel(){
   const el = document.getElementById('finalPanel');
   if(state.phase !== 'lineup') return; // don't clear finalPanel here — renderFinalPanel already owns that for other phases
-  const five = getStartingFive();
+  const sport = state.currentSport;
+  const size = getLineupSize(sport);
+  const label = lineupLabel(sport);
+  const five = getStartingLineup(sport);
   const total = five.reduce((sum, r) => sum + r.value, 0);
 
   if(!five.length){
     el.innerHTML = `
       <div class="panel">
-        <h2>My Lineup</h2>
-        <p>No results saved yet — play a full round and your outcome (deal or final case) automatically gets added here. Your best 5 results ever stay saved.</p>
+        <h2>My ${sport} Lineup</h2>
+        <p>No results saved yet — play a full round and your outcome (deal or final case) automatically gets added here. Your best ${size} results ever stay saved.</p>
         <div class="panel-actions">
           <button class="primary" id="backFromLineupBtn">Back</button>
         </div>
@@ -1871,10 +1906,10 @@ function renderLineupPanel(){
 
   el.innerHTML = `
     <div class="panel">
-      <h2>My Lineup</h2>
-      <p>Your Starting 5 — the ${LINEUP_MAX_SIZE} best results you've ever earned on this device. A new result bumps out the weakest one automatically.</p>
+      <h2>My ${sport} Lineup</h2>
+      <p>Your ${label} — the ${size} best results you've ever earned on this device playing ${sport} boards. A new result bumps out the weakest one automatically.</p>
       <div class="lineup-total">
-        <p class="lineup-total-label">Starting 5 Combined Value</p>
+        <p class="lineup-total-label">${label} Combined Value</p>
         <p class="lineup-total-value">${fmt(total)}</p>
       </div>
       <div class="lineup-grid">${fiveCardsHtml}</div>
@@ -1886,7 +1921,7 @@ function renderLineupPanel(){
   `;
   document.getElementById('backFromLineupBtn').onclick = () => { state.phase = 'setup'; render(); };
   document.getElementById('clearLineupBtn').onclick = () => {
-    try{ localStorage.removeItem(LINEUP_STORAGE_KEY); } catch(e){}
+    try{ localStorage.removeItem(lineupStorageKey(sport)); } catch(e){}
     render();
   };
 }
@@ -1996,7 +2031,7 @@ function takeDeal(){
       value: state.dealAcceptedValue,
       accolade: getAccolade(closestForLineup.player),
       wasDeal: true
-    });
+    }, state.currentSport);
   }
 }
 
