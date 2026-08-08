@@ -9,14 +9,14 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="The Vault — Spanner Sports">
 <meta property="og:description" content="A high-stakes case game built from real career stats. Pick a case, weigh the banker's offer, and see if you should hold or fold.">
-<meta property="og:image" content="https://spannersports-the-vault.vercel.app/og-image.png">
-<meta property="og:url" content="https://spannersports-the-vault.vercel.app/">
+<meta property="og:image" content="https://vault.spannersports.com/og-image.png">
+<meta property="og:url" content="https://vault.spannersports.com/">
 
 <!-- Twitter/X card -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="The Vault — Spanner Sports">
 <meta name="twitter:description" content="A high-stakes case game built from real career stats. Pick a case, weigh the banker's offer, and see if you should hold or fold.">
-<meta name="twitter:image" content="https://spannersports-the-vault.vercel.app/og-image.png">
+<meta name="twitter:image" content="https://vault.spannersports.com/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1026,7 +1026,7 @@ function buildCasesFromBoard(board){
 // button happened to be clicked from — a local file:// path during testing,
 // the admin ?admin=1 link, or a random Vercel preview-deploy URL. Shares
 // should always point to the one clean production link, regardless.
-const PRODUCTION_URL = "https://spannersports-the-vault.vercel.app";
+const PRODUCTION_URL = "https://vault.spannersports.com";
 
 function buildShareText({ resultLine, passedLine }){
   return [resultLine, passedLine, "Play The Vault yourself:", PRODUCTION_URL].filter(Boolean).join('\n');
