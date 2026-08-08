@@ -520,6 +520,41 @@
     color:var(--brass);
     margin:8px 0 0;
   }
+
+  /* ---------- Rarity tiers ---------- */
+  .rarity-badge{
+    display:inline-block;
+    font-family:'Oswald',sans-serif;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:0.15em;
+    text-transform:uppercase;
+    padding:3px 10px;
+    border-radius:3px;
+    margin:0 0 10px;
+  }
+  .hero-reveal.has-rarity{position:relative;overflow:hidden;}
+  .hero-reveal.has-foil::before{
+    content:'';
+    position:absolute;
+    inset:-50%;
+    background:linear-gradient(115deg,
+      transparent 30%,
+      rgba(255,255,255,0.22) 45%,
+      rgba(255,255,255,0.35) 50%,
+      rgba(255,255,255,0.22) 55%,
+      transparent 70%);
+    transform:rotate(8deg);
+    animation:foilSweep 2.6s ease-in-out infinite;
+    pointer-events:none;
+  }
+  @keyframes foilSweep{
+    0%{transform:translateX(-60%) rotate(8deg);}
+    100%{transform:translateX(60%) rotate(8deg);}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .hero-reveal.has-foil::before{animation:none;display:none;}
+  }
   .deal-equivalent{
     font-size:14px;
     color:var(--cream-dim);
@@ -958,6 +993,36 @@ const PLAYER_ACCOLADES = {
   "Tyrese Haliburton": "2x All-Star",
   "De'Aaron Fox": "NBA All-Star",
 };
+
+/* ---------------------------------------------------------------
+   RARITY TIERS — a labeling layer on top of the existing 26-value
+   scale ($1K-$40K / $50K-$250K / $300K-$600K / $700K-$1M splits
+   evenly into 8/8/6/4 values). No new data — just recoloring and
+   relabeling values that already exist, matching the language
+   trading-card/pack-opening audiences already speak fluently.
+------------------------------------------------------------------*/
+const RARITY_TIERS = [
+  { name: 'Legendary', min: 700000,  color: '#e9c873', glow: 'rgba(233,200,115,0.55)', foil: true  },
+  { name: 'Epic',       min: 300000,  color: '#c98fd6', glow: 'rgba(201,143,214,0.45)', foil: true  },
+  { name: 'Rare',       min: 50000,   color: '#6fb3d9', glow: 'rgba(111,179,217,0.35)', foil: false },
+  { name: 'Common',     min: 0,       color: '#9aa39b', glow: 'rgba(154,163,155,0.25)', foil: false },
+];
+
+function getRarityTier(value){
+  return RARITY_TIERS.find(t => value >= t.min) || RARITY_TIERS[RARITY_TIERS.length-1];
+}
+
+function rarityBadgeHtml(value){
+  const t = getRarityTier(value);
+  return `<span class="rarity-badge" style="color:${t.color};border:1px solid ${t.color};background:${t.glow};">${t.name}</span>`;
+}
+
+function rarityCardStyle(value){
+  const t = getRarityTier(value);
+  const classes = 'has-rarity' + (t.foil ? ' has-foil' : '');
+  const style = `border-color:${t.color} !important; box-shadow:0 0 0 1px ${t.glow}, 0 0 30px ${t.glow} !important;`;
+  return { classes, style };
+}
 
 function getAccolade(name){
   return PLAYER_ACCOLADES[name] || '';
@@ -1634,7 +1699,8 @@ function renderBoard(){
     btn.disabled = !(canPick || canOpen);
 
     if(c.opened){
-      btn.innerHTML = `<span class="case-player">${c.player}</span><span class="case-value">${fmt(c.value)}</span>`;
+      btn.style.borderColor = getRarityTier(c.value).color;
+      btn.innerHTML = `<span class="case-player">${c.player}</span><span class="case-value" style="color:${getRarityTier(c.value).color};">${fmt(c.value)}</span>`;
     } else {
       btn.innerHTML = `<span class="case-num">Case</span><span class="case-lock">${c.num}</span>`;
     }
@@ -1983,14 +2049,16 @@ function renderFinalPanel(){
       <p class="finale-eyebrow">The Vault</p>
       <p class="finale-title">The Reveal</p>
       <div class="hero-reveal-wrap">
-        <div class="hero-reveal is-yours">
+        <div class="hero-reveal is-yours ${rarityCardStyle(held.value).classes}" style="${rarityCardStyle(held.value).style}">
           <p class="hero-tag">Case #${held.num} — your case</p>
+          ${rarityBadgeHtml(held.value)}
           <p class="hero-value">${fmt(held.value)}</p>
           <p class="hero-player">${held.player}</p>
           ${getAccolade(held.player) ? `<p class="hero-accolade">${getAccolade(held.player)}</p>` : ''}
         </div>
-        <div class="hero-reveal is-passed">
+        <div class="hero-reveal is-passed ${rarityCardStyle(lastOpen.value).classes}" style="${rarityCardStyle(lastOpen.value).style}">
           <p class="hero-tag">Case #${lastOpen.num} — the one you passed on</p>
+          ${rarityBadgeHtml(lastOpen.value)}
           <p class="hero-value">${fmt(lastOpen.value)}</p>
           <p class="hero-player">${lastOpen.player}</p>
           ${getAccolade(lastOpen.player) ? `<p class="hero-accolade">${getAccolade(lastOpen.player)}</p>` : ''}
@@ -2050,8 +2118,9 @@ function renderLineupPanel(){
   }
 
   const fiveCardsHtml = five.map((r, i) => `
-    <div class="lineup-card">
+    <div class="lineup-card ${rarityCardStyle(r.value).classes}" style="${rarityCardStyle(r.value).style}">
       <p class="lineup-rank">#${i+1}</p>
+      ${rarityBadgeHtml(r.value)}
       <p class="lineup-value">${fmt(r.value)}</p>
       <p class="lineup-player">${r.player}</p>
       ${r.accolade ? `<p class="lineup-accolade">${r.accolade}</p>` : ''}
@@ -2218,8 +2287,9 @@ function openDealOverlay(){
     <p class="finale-eyebrow">The Vault</p>
     <p class="finale-title">DEAL!</p>
     <div class="hero-reveal-wrap" id="dealHeroWrap">
-      <div class="hero-reveal is-yours">
+      <div class="hero-reveal is-yours ${rarityCardStyle(state.dealAcceptedValue).classes}" style="${rarityCardStyle(state.dealAcceptedValue).style}">
         <p class="hero-tag">You banked</p>
+        ${rarityBadgeHtml(state.dealAcceptedValue)}
         <p class="hero-value">${fmt(state.dealAcceptedValue)}</p>
         <p class="hero-player">Case #${held.num} stays sealed</p>
         ${closest ? `<p class="deal-equivalent">That's about <strong>${closest.player}</strong> money (${fmt(closest.value)})</p>` : ''}
@@ -2260,8 +2330,9 @@ function openDealOverlay(){
     imagePayload.revealedPlayer = held.player;
     imagePayload.revealedValue = fmt(held.value);
     document.getElementById('dealHeroWrap').insertAdjacentHTML('beforeend', `
-      <div class="hero-reveal is-passed">
+      <div class="hero-reveal is-passed ${rarityCardStyle(held.value).classes}" style="${rarityCardStyle(held.value).style}">
         <p class="hero-tag">Case #${held.num} — what was inside</p>
+        ${rarityBadgeHtml(held.value)}
         <p class="hero-value">${fmt(held.value)}</p>
         <p class="hero-player">${held.player}</p>
         ${getAccolade(held.player) ? `<p class="hero-accolade">${getAccolade(held.player)}</p>` : ''}
