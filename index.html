@@ -749,6 +749,7 @@ let state = {
   presetLoadError: false,
   presetStatus: '',
   selectedPreset: '',
+  soundEnabled: false,
 };
 
 function fmt(n){ return '$' + n.toLocaleString('en-US'); }
@@ -778,14 +779,16 @@ const SOUNDS = {
 Object.values(SOUNDS).forEach(a => { a.preload = 'auto'; });
 
 function playSound(name){
+  if(!state.soundEnabled) return null;
   const base = SOUNDS[name];
-  if(!base) return;
+  if(!base) return null;
   try{
     // Clone so rapid repeat plays (e.g. quick case clicks) don't cut each other off.
     const instance = base.cloneNode();
     instance.volume = 0.6;
     instance.play().catch(() => { /* file missing or autoplay blocked — ignore */ });
-  } catch(e){ /* ignore */ }
+    return instance;
+  } catch(e){ return null; }
 }
 
 
@@ -1349,6 +1352,7 @@ function renderSetupPanel(){
       ${editSectionHtml}
       <div class="panel-actions">
         <button class="primary" id="startGameBtn">Start game</button>
+        <button id="soundToggleBtn">${state.soundEnabled ? '🔊 Sound: On' : '🔇 Sound: Off'}</button>
       </div>
     </div>
   `;
@@ -1390,6 +1394,11 @@ function renderSetupPanel(){
   }
 
   document.getElementById('startGameBtn').onclick = () => startGame(state.editBoard);
+  document.getElementById('soundToggleBtn').onclick = () => {
+    state.soundEnabled = !state.soundEnabled;
+    if(state.soundEnabled) playSound('caseClick'); // quick confirmation blip + unlocks audio for this session
+    renderSetupPanel();
+  };
 
   if(state.presetIndex !== null){
     document.getElementById('loadPresetBtn').onclick = () => {
@@ -1645,8 +1654,12 @@ function triggerRing(remainingUnopened){
   state.pendingOfferCases = remainingUnopened;
   state.phase = 'ringing';
   render();
-  playSound('bankerRing');
+  const ringAudio = playSound('bankerRing');
   setTimeout(()=>{
+    // Cut the ring sound off cleanly here even if the audio file itself runs
+    // longer than the on-screen ring animation — keeps sound and UI in sync
+    // regardless of how long the specific sound file happens to be.
+    if(ringAudio){ try{ ringAudio.pause(); }catch(e){} }
     if(state.phase !== 'ringing') return; // player navigated away mid-ring
     state.currentOffer = computeOffer(state.pendingOfferCases);
     state.phase = 'offer';
