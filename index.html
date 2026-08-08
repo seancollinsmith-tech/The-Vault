@@ -20,6 +20,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 <style>
   :root{
     --vault-black:#0b120e;
@@ -418,6 +419,7 @@
     padding:8px 14px;
   }
   .last-case-note strong{color:var(--brass-bright);font-weight:600;}
+  .accolade-inline{color:var(--cream-dim);font-size:12.5px;}
   @keyframes ringDots{0%{opacity:0;}30%{opacity:1;}60%{opacity:0;}100%{opacity:0;}}
   @media (prefers-reduced-motion:reduce){
     .ring-badge::before, .ring-badge::after{animation:none;opacity:0.4;}
@@ -479,6 +481,12 @@
     font-size:19px;
     color:var(--cream);
     margin:0;
+  }
+  .hero-accolade{
+    font-size:13px;
+    letter-spacing:0.03em;
+    color:var(--brass);
+    margin:8px 0 0;
   }
   @keyframes heroPop{
     0%{opacity:0;transform:scale(0.88);}
@@ -759,7 +767,90 @@ function fmt(n){ return '$' + n.toLocaleString('en-US'); }
 ------------------------------------------------------------------*/
 const SUPABASE_URL = "https://eyjizbblttbndjpqaens.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5aml6YmJsdHRibmRqcHFhZW5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxNDY3OTIsImV4cCI6MjEwMTcyMjc5Mn0.xEZWKZ3zFU3Zc2RvPTqF9OO87kCYDw4MyVu04pfkMFk";
+/* ---------------------------------------------------------------
+   PLAYER ACCOLADES — shown alongside case reveals, using the same
+   verified stats from the NBA Standard / Current Stars research.
+   Players not in this list simply show no accolade line — safe
+   fallback if a board gets edited to include someone new.
+------------------------------------------------------------------*/
+const PLAYER_ACCOLADES = {
+  "Michael Jordan": "6x Champion · 5x MVP · 14x All-Star",
+  "Kareem Abdul-Jabbar": "6x Champion · 6x MVP · 19x All-Star",
+  "LeBron James": "4x Champion · 4x MVP · 22x All-Star",
+  "Wilt Chamberlain": "2x Champion · 4x MVP · 13x All-Star",
+  "Tim Duncan": "5x Champion · 2x MVP · 15x All-Star",
+  "Bill Russell": "11x Champion · 5x MVP · 12x All-Star",
+  "Kobe Bryant": "5x Champion · 1x MVP · 18x All-Star",
+  "Magic Johnson": "5x Champion · 3x MVP · 12x All-Star",
+  "Hakeem Olajuwon": "2x Champion · 1x MVP · 2x DPOY",
+  "Shaquille O'Neal": "4x Champion · 1x MVP · 15x All-Star",
+  "Larry Bird": "3x Champion · 3x MVP · 12x All-Star",
+  "Karl Malone": "2x MVP · 14x All-Star",
+  "John Stockton": "All-Time Assists Leader · 10x All-Star",
+  "Scottie Pippen": "6x Champion · 7x All-Defense 1st Team",
+  "Robert Horry": "7x NBA Champion",
+  "Derek Fisher": "5x NBA Champion",
+  "Udonis Haslem": "3x NBA Champion",
+  "Jamal Crawford": "3x Sixth Man of the Year",
+  "Jason Terry": "NBA Champion · Sixth Man of the Year",
+  "Shane Battier": "2x NBA Champion",
+  "J.R. Smith": "2x NBA Champion",
+  "Lou Williams": "3x Sixth Man of the Year",
+  "Patrick Beverley": "All-Defensive Team",
+  "Kyle Korver": "All-Star · All-Time 3PT Leader",
+  "Jordan Clarkson": "Sixth Man of the Year",
+  "J.J. Redick": "Career 3PT Sharpshooter",
+
+  "Giannis Antetokounmpo": "Champion · 2x MVP · DPOY",
+  "Kevin Durant": "2x Champion · 2x Finals MVP · 14x All-Star",
+  "Stephen Curry": "4x Champion · 2x MVP · 2x Scoring Champ",
+  "Nikola Jokic": "Champion · 3x MVP",
+  "Kawhi Leonard": "2x Champion · 2x Finals MVP · 2x DPOY",
+  "Shai Gilgeous-Alexander": "Champion · 2x MVP · Finals MVP",
+  "Rudy Gobert": "4x Defensive Player of the Year",
+  "Anthony Davis": "NBA Champion · 8x All-Star",
+  "Luka Doncic": "2x Scoring Champion · 6x All-NBA",
+  "Damian Lillard": "7x All-Star · All-Star Game MVP",
+  "Jayson Tatum": "NBA Champion · 6x All-Star",
+  "Jaylen Brown": "Champion · Finals MVP",
+  "Victor Wembanyama": "DPOY · Rookie of the Year",
+  "Jalen Brunson": "NBA Champion · Finals MVP",
+  "Jimmy Butler": "6x All-Star · All-Defense",
+  "Donovan Mitchell": "6x All-Star · All-NBA",
+  "Karl-Anthony Towns": "NBA Champion · Rookie of the Year",
+  "Bam Adebayo": "3x All-Star · All-Defense",
+  "Cade Cunningham": "All-NBA First Team",
+  "Devin Booker": "5x All-Star",
+  "Anthony Edwards": "All-Star Game MVP",
+  "Domantas Sabonis": "3x All-Star",
+  "Trae Young": "3x All-Star",
+  "Ja Morant": "2x All-Star",
+  "Tyrese Haliburton": "2x All-Star",
+  "De'Aaron Fox": "NBA All-Star",
+};
+
+function getAccolade(name){
+  return PLAYER_ACCOLADES[name] || '';
+}
+
+/* ---------------------------------------------------------------
+   BIG-WIN CELEBRATION — fires only for the player's own outcome
+   (their held case value, or a big deal they accepted), never for
+   just any high-value case that happens to appear on the board.
+------------------------------------------------------------------*/
+const BIG_WIN_THRESHOLD = 500000;
+
+function celebrateIfBig(value){
+  if(value < BIG_WIN_THRESHOLD) return;
+  if(typeof confetti !== 'function') return;
+  const colors = ['#c9a04d', '#e9c873', '#f2ead6'];
+  confetti({ particleCount: 140, spread: 80, origin: { y: 0.35 }, colors, scalar: 1.1 });
+  setTimeout(() => confetti({ particleCount: 90, spread: 100, origin: { y: 0.5 }, colors, scalar: 0.9 }), 200);
+}
+
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+
 
 /* ---------------------------------------------------------------
    SOUND EFFECTS
@@ -1452,7 +1543,7 @@ function renderOfferPanel(){
           <div class="ring-stage">
             <div class="ring-badge"><span class="ring-glyph">☎</span></div>
             <p class="ring-text">Incoming call<span class="dots"><span>.</span><span>.</span><span>.</span></span></p>
-            ${last ? `<p class="last-case-note">Last case opened: <strong>${fmt(last.value)}</strong> — ${last.player}</p>` : ''}
+            ${last ? `<p class="last-case-note">Last case opened: <strong>${fmt(last.value)}</strong> — ${last.player}${getAccolade(last.player) ? ` <span class="accolade-inline">(${getAccolade(last.player)})</span>` : ''}</p>` : ''}
           </div>
           ${renderOfferHistorySide()}
         </div>
@@ -1471,7 +1562,7 @@ function renderOfferPanel(){
       <div class="offer-panel-body">
         <div style="flex:1 1 260px;">
           <div class="offer-amount">${fmt(state.currentOffer)}</div>
-          ${last ? `<p class="last-case-note">Last case opened: <strong>${fmt(last.value)}</strong> — ${last.player}</p>` : ''}
+          ${last ? `<p class="last-case-note">Last case opened: <strong>${fmt(last.value)}</strong> — ${last.player}${getAccolade(last.player) ? ` <span class="accolade-inline">(${getAccolade(last.player)})</span>` : ''}</p>` : ''}
           <div class="panel-actions">
             <button class="primary" id="dealBtn">Deal</button>
             <button class="ghost-ember" id="noDealBtn">No deal</button>
@@ -1528,6 +1619,7 @@ function renderFinalPanel(){
     state.heldRevealed = true;
     lastOpen.opened = true;
     playSound('revealSting');
+    celebrateIfBig(held.value);
     renderLadder();
 
     const overlay = document.getElementById('finaleOverlay');
@@ -1553,11 +1645,13 @@ function renderFinalPanel(){
           <p class="hero-tag">Case #${held.num} — your case</p>
           <p class="hero-value">${fmt(held.value)}</p>
           <p class="hero-player">${held.player}</p>
+          ${getAccolade(held.player) ? `<p class="hero-accolade">${getAccolade(held.player)}</p>` : ''}
         </div>
         <div class="hero-reveal is-passed">
           <p class="hero-tag">Case #${lastOpen.num} — the one you passed on</p>
           <p class="hero-value">${fmt(lastOpen.value)}</p>
           <p class="hero-player">${lastOpen.player}</p>
+          ${getAccolade(lastOpen.player) ? `<p class="hero-accolade">${getAccolade(lastOpen.player)}</p>` : ''}
         </div>
       </div>
       <div class="panel-actions" style="justify-content:center;">
@@ -1687,6 +1781,7 @@ function takeDeal(){
   state.phase = 'dealt';
   render();
   openDealOverlay();
+  celebrateIfBig(state.dealAcceptedValue);
 }
 
 function openDealOverlay(){
@@ -1755,6 +1850,7 @@ function openDealOverlay(){
         <p class="hero-tag">Case #${held.num} — what was inside</p>
         <p class="hero-value">${fmt(held.value)}</p>
         <p class="hero-player">${held.player}</p>
+        ${getAccolade(held.player) ? `<p class="hero-accolade">${getAccolade(held.player)}</p>` : ''}
       </div>
     `);
     e.target.remove();
