@@ -1073,6 +1073,7 @@ async function startDailyChallenge(){
     return;
   }
   state.currentSport = daily.sport;
+  state.editBoard = daily.board; // so "Play again" continues with this same board, not whatever was set before
   markDailyStarted();
   startGame(daily.board);
   state.isDailyMode = true; // set after startGame(), which resets other per-game flags
@@ -1991,7 +1992,7 @@ function renderFinalPanel(){
         </div>
       </div>
       <div class="panel-actions" style="justify-content:center;">
-        <button class="primary" id="playAgainBtn2">Play again</button>
+        <button class="primary" id="playAgainBtn2">${state.isDailyMode ? 'Practice' : 'Play again'}</button>
         ${state.declinedOffers.length ? '<button id="viewHistoryBtn2">View offer history</button>' : ''}
         <button id="shareResultBtn2" ${navigator.share ? '' : 'style="display:none;"'}>Share</button>
         <button id="copyResultBtn2">Copy result</button>
@@ -2221,7 +2222,7 @@ function openDealOverlay(){
       ${state.declinedOffers.length ? '<button id="viewHistoryBtnOverlay">View offer history</button>' : ''}
       <button id="shareResultBtnOverlay" ${navigator.share ? '' : 'style="display:none;"'}>Share</button>
       <button id="copyResultBtnOverlay">Copy result</button>
-      <button class="primary" id="playAgainBtnOverlay">Play again</button>
+      <button class="primary" id="playAgainBtnOverlay">${state.isDailyMode ? 'Practice' : 'Play again'}</button>
     </div>
     ${state.declinedOffers.length ? `
       <div class="finale-history hidden" id="finaleHistoryOverlay">
