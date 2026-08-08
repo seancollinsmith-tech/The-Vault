@@ -267,6 +267,14 @@
     margin:0 0 14px;
     color:var(--cream);
   }
+  .how-to-play{
+    font-size:16px;
+    color:var(--brass-bright);
+    margin:0 0 22px;
+    padding-bottom:18px;
+    border-bottom:1px solid var(--line);
+    line-height:1.5;
+  }
   .offer-amount{
     font-family:'Oswald',sans-serif;
     font-weight:700;
@@ -1292,6 +1300,7 @@ function renderSetupPanel(){
   el.innerHTML = `
     <div class="panel">
       <h2>Set the board</h2>
+      <p class="how-to-play">Pick a case, then decide: take the banker's offer, or risk it for what's inside.</p>
       <p>${isAdmin
         ? 'Edit any player or value below — changes apply the moment you start. Case order is shuffled fresh every game, so the numbers never map to this list.'
         : 'Pick a saved board below, or just start with the default.'}</p>
