@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Vault — Spanner Sports</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --vault-black:#0b120e;
+    --vault-green:#10241a;
+    --vault-green-2:#173427;
+    --brass:#c9a04d;
+    --brass-bright:#e9c873;
+    --cream:#f2ead6;
+    --cream-dim:#c7c0ad;
+    --ember:#c1440e;
+    --win:#3f8f5f;
+    --line:rgba(201,160,77,0.25);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at 50% -10%, rgba(201,160,77,0.10), transparent 60%),
+      var(--vault-black);
+    color:var(--cream);
+    font-family:'Oswald',sans-serif;
+    min-height:100vh;
+    padding:28px 16px 60px;
+    overflow-x:hidden;
+  }
+  .wrap{max-width:1100px;margin:0 auto;}
+
+  /* ---------- Header ---------- */
+  header{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:16px;
+    flex-wrap:wrap;
+    border-bottom:1px solid var(--line);
+    padding-bottom:18px;
+    margin-bottom:22px;
+  }
+  .brand-eyebrow{
+    font-family:'Oswald',sans-serif;
+    font-size:11px;
+    letter-spacing:0.35em;
+    text-transform:uppercase;
+    color:var(--brass);
+    margin:0 0 6px;
+  }
+  h1{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-style:italic;
+    font-size:clamp(28px,4vw,44px);
+    margin:0;
+    color:var(--cream);
+    letter-spacing:0.01em;
+  }
+  h1 span{color:var(--brass-bright);font-style:normal;}
+  .header-actions{display:flex;gap:10px;flex-wrap:wrap;}
+
+  button{
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    font-size:13px;
+    cursor:pointer;
+    border-radius:3px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--cream-dim);
+    padding:10px 16px;
+    transition:border-color .15s, color .15s, background .15s;
+  }
+  button:hover{border-color:var(--brass);color:var(--cream);}
+  button:focus-visible{outline:2px solid var(--brass-bright);outline-offset:2px;}
+  button.primary{
+    background:var(--brass);
+    border-color:var(--brass);
+    color:#1a1005;
+  }
+  button.primary:hover{background:var(--brass-bright);border-color:var(--brass-bright);}
+  button.ghost-ember{border-color:rgba(193,68,14,0.4);color:#e08a5f;}
+  button.ghost-ember:hover{border-color:var(--ember);color:#ffb389;}
+  button:disabled{opacity:0.35;cursor:not-allowed;}
+  button:disabled:hover{border-color:var(--line);color:var(--cream-dim);background:transparent;}
+
+  /* ---------- Status strip ---------- */
+  .status-strip{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
+    background:var(--vault-green);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:14px 20px;
+    margin-bottom:22px;
+  }
+  .status-block{display:flex;flex-direction:column;gap:2px;}
+  .status-label{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--cream-dim);}
+  .status-value{font-size:18px;font-weight:600;color:var(--brass-bright);font-variant-numeric:tabular-nums;}
+
+  /* ---------- Board grid ---------- */
+  .game-area{
+    display:flex;
+    gap:24px;
+    align-items:flex-start;
+    flex-wrap:nowrap;
+    margin-bottom:24px;
+  }
+  .board{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(88px,1fr));
+    gap:10px;
+    flex:1 1 auto;
+    min-width:0;
+  }
+
+  /* ---------- Value ladder ---------- */
+  .ladder{
+    flex:0 0 260px;
+    display:flex;
+    gap:8px;
+  }
+  .ladder-col{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .ladder-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:6px;
+    background:linear-gradient(90deg,var(--vault-green-2),var(--vault-green));
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:5px 9px;
+    font-size:12.5px;
+    font-weight:500;
+    font-variant-numeric:tabular-nums;
+    color:var(--cream);
+    transition:opacity .2s, background .2s, border-color .2s;
+  }
+  .ladder-row .lv-dollar{color:var(--brass);font-weight:600;}
+  .ladder-row.struck{
+    opacity:0.28;
+    background:var(--vault-black);
+    border-color:rgba(201,160,77,0.08);
+  }
+  .ladder-row.struck .lv-value{text-decoration:line-through;text-decoration-color:var(--ember);}
+  .ladder-row.struck .lv-dollar{color:var(--cream-dim);}
+  .ladder-row.held-value{
+    border-color:var(--brass-bright);
+    box-shadow:0 0 0 1px var(--brass-bright);
+  }
+  @media (max-width:640px){
+    .game-area{flex-direction:column;flex-wrap:nowrap;}
+    .board{width:100%;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));}
+    .ladder{flex:0 0 auto;width:100%;}
+    .status-strip{gap:14px 22px;padding:14px 16px;}
+    .case-num{font-size:9px;}
+    .case-lock{font-size:16px;}
+    body{padding-top:40px;}
+  }
+  .case-btn{
+    aspect-ratio:1/1.15;
+    background:linear-gradient(160deg,var(--vault-green-2),var(--vault-green));
+    border:1px solid var(--line);
+    border-radius:6px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    padding:6px 4px;
+    position:relative;
+    overflow:hidden;
+    text-align:center;
+  }
+  .case-btn::before{
+    content:'';
+    position:absolute;
+    inset:6px;
+    border:1px solid rgba(201,160,77,0.15);
+    border-radius:4px;
+    pointer-events:none;
+  }
+  .case-num{
+    font-size:11px;
+    letter-spacing:0.1em;
+    color:var(--brass);
+    text-transform:uppercase;
+  }
+  .case-lock{font-size:20px;color:var(--brass-bright);}
+  .case-btn:hover:not(:disabled){border-color:var(--brass-bright);transform:translateY(-2px);}
+  .case-btn:disabled{cursor:default;}
+  .case-btn.held{
+    border-color:var(--brass-bright);
+    box-shadow:0 0 0 1px var(--brass-bright), 0 0 18px rgba(233,200,115,0.25);
+  }
+  .case-btn.held::after{
+    content:'YOUR CASE';
+    position:absolute;
+    bottom:6px;
+    font-size:8px;
+    letter-spacing:0.12em;
+    color:var(--brass-bright);
+    font-weight:600;
+  }
+  .case-btn.opened{
+    background:linear-gradient(160deg,#1c1108,#150c05);
+    border-color:rgba(193,68,14,0.35);
+  }
+  .case-btn.opened .case-player{
+    font-family:'Fraunces',serif;
+    font-size:11px;
+    font-weight:600;
+    color:var(--cream);
+    line-height:1.15;
+  }
+  .case-btn.opened .case-value{
+    font-family:'Oswald',sans-serif;
+    font-size:11.5px;
+    font-weight:600;
+    color:var(--ember);
+  }
+
+  /* ---------- Panels (offer / final / setup) ---------- */
+  .panel{
+    background:var(--vault-green);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:26px;
+    margin-bottom:24px;
+  }
+  .panel h2{
+    font-family:'Fraunces',serif;
+    font-style:italic;
+    font-weight:600;
+    font-size:22px;
+    margin:0 0 14px;
+    color:var(--cream);
+  }
+  .offer-amount{
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:clamp(36px,6vw,56px);
+    color:var(--brass-bright);
+    letter-spacing:0.01em;
+    margin:6px 0 18px;
+    font-variant-numeric:tabular-nums;
+  }
+  .panel p{color:var(--cream-dim);line-height:1.6;font-size:15px;margin:0 0 18px;max-width:60ch;}
+  .panel-actions{display:flex;gap:12px;flex-wrap:wrap;}
+
+  /* ---------- Setup / edit table ---------- */
+  .edit-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .edit-table th{
+    text-align:left;
+    font-size:10px;
+    letter-spacing:0.15em;
+    text-transform:uppercase;
+    color:var(--brass);
+    border-bottom:1px solid var(--line);
+    padding:8px 8px;
+  }
+  .edit-table td{border-bottom:1px solid rgba(201,160,77,0.1);padding:6px 8px;}
+  .edit-table input{
+    width:100%;
+    background:var(--vault-black);
+    border:1px solid var(--line);
+    border-radius:3px;
+    color:var(--cream);
+    font-family:'Oswald',sans-serif;
+    font-size:13px;
+    padding:6px 8px;
+  }
+  .edit-table input:focus-visible{outline:2px solid var(--brass-bright);outline-offset:1px;}
+  .edit-table input.val{text-align:right;font-variant-numeric:tabular-nums;}
+  .table-scroll{max-height:420px;overflow-y:auto;margin-bottom:18px;border:1px solid var(--line);border-radius:4px;}
+
+  /* ---------- Presets ---------- */
+  .preset-block{
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:16px 18px;
+    margin-bottom:20px;
+    background:rgba(201,160,77,0.04);
+  }
+  .preset-block h3{
+    font-size:10px;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    color:var(--brass);
+    margin:0 0 12px;
+  }
+  .preset-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+  .preset-row:last-child{margin-bottom:0;}
+  select, .preset-row input[type="text"]{
+    background:var(--vault-black);
+    border:1px solid var(--line);
+    border-radius:3px;
+    color:var(--cream);
+    font-family:'Oswald',sans-serif;
+    font-size:13px;
+    padding:9px 12px;
+    min-width:180px;
+  }
+  select:focus-visible, .preset-row input:focus-visible{outline:2px solid var(--brass-bright);outline-offset:1px;}
+  .preset-hint{font-size:11.5px;color:var(--cream-dim);margin:0;}
+  .preset-status{font-size:11.5px;color:var(--brass-bright);margin:8px 0 0;min-height:14px;}
+
+  /* ---------- Banker ringing ---------- */
+  .ring-stage{display:flex;flex-direction:column;align-items:flex-start;gap:18px;padding:10px 0 4px;}
+  .ring-badge{
+    position:relative;
+    width:64px;height:64px;
+    display:flex;align-items:center;justify-content:center;
+    border-radius:50%;
+    background:var(--vault-black);
+    border:1px solid var(--brass);
+  }
+  .ring-badge::before, .ring-badge::after{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:50%;
+    border:1px solid var(--brass);
+    animation:ringPulse 1.6s ease-out infinite;
+  }
+  .ring-badge::after{animation-delay:.5s;}
+  .ring-glyph{font-size:26px;line-height:1;}
+  @keyframes ringPulse{
+    0%{transform:scale(1);opacity:0.9;}
+    100%{transform:scale(2.1);opacity:0;}
+  }
+  .ring-text{font-size:13px;letter-spacing:0.15em;text-transform:uppercase;color:var(--cream-dim);}
+  .ring-text .dots span{animation:ringDots 1.4s infinite;opacity:0;}
+  .ring-text .dots span:nth-child(2){animation-delay:.2s;}
+  .ring-text .dots span:nth-child(3){animation-delay:.4s;}
+  @keyframes ringDots{0%{opacity:0;}30%{opacity:1;}60%{opacity:0;}100%{opacity:0;}}
+  @media (prefers-reduced-motion:reduce){
+    .ring-badge::before, .ring-badge::after{animation:none;opacity:0.4;}
+    .ring-text .dots span{animation:none;opacity:1;}
+  }
+
+  /* ---------- Deal history ---------- */
+  .history-list{list-style:none;margin:0 0 18px;padding:0;display:flex;flex-direction:column;gap:8px;}
+  .history-list li{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    font-size:13.5px;
+    color:var(--cream-dim);
+    border-bottom:1px solid rgba(201,160,77,0.12);
+    padding-bottom:8px;
+  }
+  .history-list li strong{color:var(--ember);font-weight:600;}
+  .history-list li span.round-tag{color:var(--brass);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap;}
+
+  footer{text-align:center;color:var(--cream-dim);font-size:11px;letter-spacing:0.08em;margin-top:30px;opacity:0.6;}
+
+  @media (prefers-reduced-motion:reduce){
+    .case-btn{transition:none;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <p class="brand-eyebrow">Spanner Sports · Career Score Engine</p>
+      <h1>The <span>Vault</span></h1>
+    </div>
+    <div class="header-actions" id="headerActions"></div>
+  </header>
+
+  <div class="status-strip" id="statusStrip" style="display:none;"></div>
+
+  <div id="setupPanel"></div>
+  <div id="offerPanel"></div>
+
+  <div class="game-area" id="gameArea">
+    <div class="board" id="board"></div>
+    <div class="ladder" id="ladder"></div>
+  </div>
+
+  <div id="finalPanel"></div>
+
+  <footer>26 cases · $1,000 – $1,000,000 · values from the Career Score Engine board, verified Aug 2026</footer>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   DATA — the verified 26-case board. Editable in Setup mode.
+   Nothing here persists to disk/browser storage; it's all in memory
+   for this session only, as required.
+------------------------------------------------------------------*/
+const DEFAULT_BOARD = [
+  { value: 1000000, player: "Michael Jordan" },
+  { value: 900000,  player: "Kareem Abdul-Jabbar" },
+  { value: 800000,  player: "LeBron James" },
+  { value: 700000,  player: "Wilt Chamberlain" },
+  { value: 600000,  player: "Tim Duncan" },
+  { value: 500000,  player: "Bill Russell" },
+  { value: 450000,  player: "Kobe Bryant" },
+  { value: 400000,  player: "Magic Johnson" },
+  { value: 350000,  player: "Hakeem Olajuwon" },
+  { value: 300000,  player: "Shaquille O'Neal" },
+  { value: 250000,  player: "Larry Bird" },
+  { value: 200000,  player: "Karl Malone" },
+  { value: 175000,  player: "John Stockton" },
+  { value: 150000,  player: "Scottie Pippen" },
+  { value: 125000,  player: "Robert Horry" },
+  { value: 100000,  player: "Derek Fisher" },
+  { value: 75000,   player: "Udonis Haslem" },
+  { value: 50000,   player: "Jamal Crawford" },
+  { value: 40000,   player: "Jason Terry" },
+  { value: 30000,   player: "Shane Battier" },
+  { value: 25000,   player: "J.R. Smith" },
+  { value: 20000,   player: "Lou Williams" },
+  { value: 15000,   player: "Patrick Beverley" },
+  { value: 10000,   player: "Kyle Korver" },
+  { value: 5000,    player: "Jordan Clarkson" },
+  { value: 1000,    player: "J.J. Redick" },
+];
+
+const ROUND_SCHEDULE = [6,5,4,3,2,2,1,1]; // cases opened per round before final 2 remain
+const ROUND_MULTIPLIER = [0.62,0.68,0.75,0.82,0.88,0.92,0.97,1.02];
+
+/* ---------------------------------------------------------------
+   STATE
+------------------------------------------------------------------*/
+let state = {
+  phase: 'setup',        // setup | pick | playing | ringing | offer | dealt | final
+  editBoard: DEFAULT_BOARD.map(c => ({...c})),
+  cases: [],              // [{num, value, player, opened}]
+  heldCaseNum: null,
+  roundIndex: 0,
+  casesOpenedThisRound: 0,
+  currentOffer: 0,
+  dealAcceptedValue: null,
+  heldRevealed: false,
+  declinedOffers: [],     // [{round, offer}]
+  pendingOfferCases: null,
+  presetIndex: null,      // null = not loaded yet, [] = loaded, empty
+  presetLoadError: false,
+  presetStatus: '',
+  selectedPreset: '',
+};
+
+function fmt(n){ return '$' + n.toLocaleString('en-US'); }
+
+/* ---------------------------------------------------------------
+   PRESET STORAGE — Supabase (shared across everyone with the link)
+------------------------------------------------------------------*/
+const SUPABASE_URL = "https://eyjizbblttbndjpqaens.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5aml6YmJsdHRibmRqcHFhZW5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxNDY3OTIsImV4cCI6MjEwMTcyMjc5Mn0.xEZWKZ3zFU3Zc2RvPTqF9OO87kCYDw4MyVu04pfkMFk";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+async function loadPresetIndex(){
+  try{
+    const { data, error } = await sb.from('vault_presets').select('name').order('name');
+    if(error) throw error;
+    state.presetIndex = data.map(r => r.name);
+  } catch(e){
+    state.presetIndex = [];
+    state.presetLoadError = true;
+    state.presetStatus = 'Could not reach the shared board database.';
+  }
+  renderSetupPanel();
+}
+
+async function savePresetAs(name, board){
+  if(!name || !name.trim()) return;
+  const clean = name.trim();
+  try{
+    const { error } = await sb.from('vault_presets')
+      .upsert({ name: clean, board: board, updated_at: new Date().toISOString() });
+    if(error) throw error;
+    if(!state.presetIndex.includes(clean)){
+      state.presetIndex.push(clean);
+      state.presetIndex.sort();
+    }
+    state.presetStatus = `Saved "${clean}."`;
+    state.selectedPreset = clean;
+  } catch(e){
+    state.presetStatus = 'Could not save — try again.';
+  }
+  renderSetupPanel();
+}
+
+async function loadPresetByName(name){
+  if(!name) return;
+  try{
+    const { data, error } = await sb.from('vault_presets').select('board').eq('name', name).single();
+    if(error) throw error;
+    state.editBoard = data.board.map(c => ({...c}));
+    state.presetStatus = `Loaded "${name}."`;
+    state.selectedPreset = name;
+  } catch(e){
+    state.presetStatus = 'Could not load that preset.';
+  }
+  renderSetupPanel();
+}
+
+async function deletePresetByName(name){
+  if(!name) return;
+  try{
+    const { error } = await sb.from('vault_presets').delete().eq('name', name);
+    if(error) throw error;
+    state.presetIndex = state.presetIndex.filter(n => n !== name);
+    state.presetStatus = `Deleted "${name}."`;
+    if(state.selectedPreset === name) state.selectedPreset = '';
+  } catch(e){
+    state.presetStatus = 'Could not delete that preset.';
+  }
+  renderSetupPanel();
+}
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function buildCasesFromBoard(board){
+  const shuffled = shuffle(board);
+  return shuffled.map((c,i)=>({
+    num: i+1,
+    value: c.value,
+    player: c.player,
+    opened: false,
+  }));
+}
+
+/* ---------------------------------------------------------------
+   RENDER
+------------------------------------------------------------------*/
+function render(){
+  renderHeaderActions();
+  renderStatusStrip();
+  renderSetupPanel();
+  renderOfferPanel();
+  renderBoard();
+  renderLadder();
+  renderFinalPanel();
+}
+
+function renderHeaderActions(){
+  const el = document.getElementById('headerActions');
+  el.innerHTML = '';
+  if(state.phase === 'setup'){
+    return; // actions live inside setup panel
+  }
+  const editBtn = document.createElement('button');
+  editBtn.textContent = 'Edit board';
+  editBtn.onclick = () => { state.phase = 'setup'; render(); };
+  el.appendChild(editBtn);
+
+  const newBtn = document.createElement('button');
+  newBtn.textContent = 'New game, same board';
+  newBtn.onclick = () => startGame(state.editBoard);
+  el.appendChild(newBtn);
+}
+
+function renderStatusStrip(){
+  const el = document.getElementById('statusStrip');
+  if(state.phase === 'setup'){ el.style.display='none'; return; }
+  el.style.display='flex';
+
+  const remaining = state.cases.filter(c=>!c.opened && c.num !== state.heldCaseNum).length;
+  const roundLabel = state.phase === 'final' ? 'Final reveal' :
+    (state.roundIndex < ROUND_SCHEDULE.length ? `Round ${state.roundIndex+1} of ${ROUND_SCHEDULE.length}` : 'Final reveal');
+
+  const toOpen = state.phase === 'playing' ?
+    Math.max(0, ROUND_SCHEDULE[state.roundIndex] - state.casesOpenedThisRound) : 0;
+
+  el.innerHTML = `
+    <div class="status-block">
+      <span class="status-label">Status</span>
+      <span class="status-value">${roundLabel}</span>
+    </div>
+    <div class="status-block">
+      <span class="status-label">Cases left on board</span>
+      <span class="status-value">${remaining}</span>
+    </div>
+    ${state.phase==='playing' ? `
+    <div class="status-block">
+      <span class="status-label">Open this round</span>
+      <span class="status-value">${toOpen}</span>
+    </div>` : ''}
+    <div class="status-block">
+      <span class="status-label">Your case</span>
+      <span class="status-value">#${state.heldCaseNum ?? '—'}</span>
+    </div>
+  `;
+}
+
+function renderBoard(){
+  const el = document.getElementById('board');
+  const gameArea = document.getElementById('gameArea');
+  if(state.phase === 'setup'){ el.innerHTML=''; gameArea.style.display='none'; return; }
+  gameArea.style.display='flex';
+
+  el.innerHTML = '';
+  state.cases.forEach(c=>{
+    const btn = document.createElement('button');
+    btn.className = 'case-btn';
+    if(c.num === state.heldCaseNum) btn.classList.add('held');
+    if(c.opened) btn.classList.add('opened');
+
+    const canPick = state.phase === 'pick' && !c.opened;
+    const canOpen = state.phase === 'playing' && !c.opened && c.num !== state.heldCaseNum;
+    btn.disabled = !(canPick || canOpen);
+
+    if(c.opened){
+      btn.innerHTML = `<span class="case-player">${c.player}</span><span class="case-value">${fmt(c.value)}</span>`;
+    } else {
+      btn.innerHTML = `<span class="case-num">Case</span><span class="case-lock">${c.num}</span>`;
+    }
+
+    btn.onclick = () => {
+      if(canPick) pickCase(c.num);
+      else if(canOpen) openCase(c.num);
+    };
+    el.appendChild(btn);
+  });
+}
+
+function renderLadder(){
+  const el = document.getElementById('ladder');
+  if(state.phase === 'setup' || state.cases.length === 0){ el.innerHTML=''; return; }
+
+  const heldCase = state.cases.find(c=>c.num===state.heldCaseNum);
+  const heldValue = heldCase ? heldCase.value : null;
+
+  const sortedValues = state.cases
+    .map(c=>({ value:c.value, opened:c.opened, isHeld: c.num===state.heldCaseNum }))
+    .sort((a,b)=>a.value-b.value);
+
+  const half = Math.ceil(sortedValues.length/2);
+  const leftCol = sortedValues.slice(0, half);
+  const rightCol = sortedValues.slice(half);
+
+  const rowHtml = (entry) => `
+    <div class="ladder-row${entry.opened ? ' struck' : ''}${entry.isHeld && state.heldRevealed ? ' held-value' : ''}">
+      <span class="lv-dollar">$</span><span class="lv-value">${entry.value.toLocaleString('en-US')}</span>
+    </div>`;
+
+  el.innerHTML = `
+    <div class="ladder-col">${leftCol.map(rowHtml).join('')}</div>
+    <div class="ladder-col">${rightCol.map(rowHtml).join('')}</div>
+  `;
+}
+
+function renderSetupPanel(){
+  const el = document.getElementById('setupPanel');
+  if(state.phase !== 'setup'){ el.innerHTML=''; return; }
+
+  const presetOptionsHtml = (state.presetIndex || []).map(name =>
+    `<option value="${name}" ${name===state.selectedPreset ? 'selected':''}>${name}</option>`
+  ).join('');
+
+  const presetBlockHtml = state.presetIndex === null ? `
+    <div class="preset-block"><p class="preset-hint">Loading saved boards…</p></div>
+  ` : `
+    <div class="preset-block">
+      <h3>Saved boards</h3>
+      <div class="preset-row">
+        <select id="presetSelect">
+          <option value="">— Choose a saved board —</option>
+          ${presetOptionsHtml}
+        </select>
+        <button id="loadPresetBtn">Load</button>
+        <button class="ghost-ember" id="deletePresetBtn">Delete</button>
+      </div>
+      <div class="preset-row">
+        <input type="text" id="presetNameInput" placeholder="Name this board (e.g. Current Stars)">
+        <button class="primary" id="savePresetBtn">Save current board as new preset</button>
+      </div>
+      <p class="preset-hint">${state.presetLoadError
+        ? 'Could not connect to the shared board database — check your connection and reload.'
+        : 'Saved boards are shared — anyone who opens this link can see, load, or overwrite them. "Load" replaces the table below — remember to save first if you don\'t want to lose edits.'}</p>
+      <p class="preset-status">${state.presetStatus}</p>
+    </div>
+  `;
+
+  el.innerHTML = `
+    <div class="panel">
+      <h2>Set the board</h2>
+      <p>Edit any player or value below — changes apply the moment you start. Case order is shuffled fresh every game, so the numbers never map to this list.</p>
+      ${presetBlockHtml}
+      <div class="table-scroll">
+        <table class="edit-table">
+          <thead><tr><th style="width:60px;">#</th><th>Player</th><th style="width:140px;">Value ($)</th></tr></thead>
+          <tbody id="editRows"></tbody>
+        </table>
+      </div>
+      <div class="panel-actions">
+        <button class="primary" id="startGameBtn">Start game</button>
+        <button id="resetBoardBtn">Reset to verified board</button>
+      </div>
+    </div>
+  `;
+
+  const rows = document.getElementById('editRows');
+  rows.innerHTML = state.editBoard.map((c,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td><input type="text" data-idx="${i}" data-field="player" value="${c.player.replace(/"/g,'&quot;')}"></td>
+      <td><input type="number" class="val" min="0" step="1" data-idx="${i}" data-field="value" value="${c.value}"></td>
+    </tr>
+  `).join('');
+
+  rows.querySelectorAll('input').forEach(input=>{
+    input.addEventListener('input', (e)=>{
+      const idx = Number(e.target.dataset.idx);
+      const field = e.target.dataset.field;
+      state.editBoard[idx][field] = field === 'value' ? Number(e.target.value || 0) : e.target.value;
+    });
+  });
+
+  document.getElementById('startGameBtn').onclick = () => startGame(state.editBoard);
+  document.getElementById('resetBoardBtn').onclick = () => {
+    state.editBoard = DEFAULT_BOARD.map(c=>({...c}));
+    render();
+  };
+
+  if(state.presetIndex !== null){
+    document.getElementById('loadPresetBtn').onclick = () => {
+      const sel = document.getElementById('presetSelect').value;
+      if(sel) loadPresetByName(sel);
+    };
+    document.getElementById('deletePresetBtn').onclick = () => {
+      const sel = document.getElementById('presetSelect').value;
+      if(sel) deletePresetByName(sel);
+    };
+    document.getElementById('savePresetBtn').onclick = () => {
+      const nameInput = document.getElementById('presetNameInput');
+      savePresetAs(nameInput.value, state.editBoard);
+    };
+  }
+}
+
+function renderOfferPanel(){
+  const el = document.getElementById('offerPanel');
+
+  if(state.phase === 'ringing'){
+    el.innerHTML = `
+      <div class="panel">
+        <h2>The Banker</h2>
+        <div class="ring-stage">
+          <div class="ring-badge"><span class="ring-glyph">☎</span></div>
+          <p class="ring-text">Incoming call<span class="dots"><span>.</span><span>.</span><span>.</span></span></p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  if(state.phase !== 'offer'){ el.innerHTML=''; return; }
+
+  el.innerHTML = `
+    <div class="panel">
+      <h2>The banker is calling</h2>
+      <p>${state.roundIndex+1 < ROUND_SCHEDULE.length ? `Round ${state.roundIndex+1} is done.` : 'This is the final offer.'} Based on what's left on the board, here's what the banker is offering to buy your case right now.</p>
+      <div class="offer-amount">${fmt(state.currentOffer)}</div>
+      <div class="panel-actions">
+        <button class="primary" id="dealBtn">Deal</button>
+        <button class="ghost-ember" id="noDealBtn">No deal</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('dealBtn').onclick = takeDeal;
+  document.getElementById('noDealBtn').onclick = declineDeal;
+}
+
+function renderFinalPanel(){
+  const el = document.getElementById('finalPanel');
+  if(state.phase !== 'final' && state.phase !== 'dealt'){ el.innerHTML=''; return; }
+
+  const held = state.cases.find(c=>c.num===state.heldCaseNum);
+
+  const historyHtml = state.declinedOffers.length ? `
+    <h3 style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--brass);margin:20px 0 10px;">Offers you passed on</h3>
+    <ul class="history-list">
+      ${state.declinedOffers.map(d => `<li><span class="round-tag">Round ${d.round}</span> <strong>${fmt(d.offer)}</strong></li>`).join('')}
+    </ul>
+  ` : '';
+
+  if(state.phase === 'dealt'){
+    el.innerHTML = `
+      <div class="panel">
+        <h2>Deal.</h2>
+        <p>You banked <strong style="color:var(--brass-bright)">${fmt(state.dealAcceptedValue)}</strong>. Your case (#${held.num}) held <strong>${held.player}</strong>, worth ${fmt(held.value)} — that stays sealed. Reveal it below if you want to know what you walked away from.</p>
+        ${historyHtml}
+        <div class="panel-actions">
+          <button id="revealHeldBtn">Reveal your case anyway</button>
+          <button class="primary" id="playAgainBtn">Play again</button>
+        </div>
+        <div id="revealSlot" style="margin-top:16px;"></div>
+      </div>
+    `;
+    document.getElementById('playAgainBtn').onclick = () => startGame(state.editBoard);
+    document.getElementById('revealHeldBtn').onclick = () => {
+      state.heldRevealed = true;
+      document.getElementById('revealSlot').innerHTML =
+        `<p style="color:var(--cream)">Case #${held.num} — <strong>${held.player}</strong> — was worth ${fmt(held.value)}.</p>`;
+      renderLadder();
+    };
+    return;
+  }
+
+  // phase === 'final': one case left besides held case
+  const lastOpen = state.cases.find(c=>!c.opened && c.num !== state.heldCaseNum);
+
+  el.innerHTML = `
+    <div class="panel">
+      <h2>Final two cases</h2>
+      <p>No deal, all the way. It's down to your case (#${held.num}) and case #${lastOpen.num}. Open your case to see what you actually had.</p>
+      ${historyHtml}
+      <div class="panel-actions">
+        <button class="primary" id="finalRevealBtn">Open your case</button>
+      </div>
+      <div id="finalRevealSlot" style="margin-top:16px;"></div>
+    </div>
+  `;
+  document.getElementById('finalRevealBtn').onclick = () => {
+    state.heldRevealed = true;
+    lastOpen.opened = true;
+    document.getElementById('finalRevealSlot').innerHTML = `
+      <p style="color:var(--cream)">Case #${held.num} — <strong>${held.player}</strong> — was worth ${fmt(held.value)}.</p>
+      <p style="color:var(--cream)">The one you passed on, case #${lastOpen.num} — <strong>${lastOpen.player}</strong> — was worth ${fmt(lastOpen.value)}.</p>
+      <div class="panel-actions" style="margin-top:14px;">
+        <button class="primary" id="playAgainBtn2">Play again</button>
+      </div>
+    `;
+    renderLadder();
+    document.getElementById('playAgainBtn2').onclick = () => startGame(state.editBoard);
+  };
+}
+
+/* ---------------------------------------------------------------
+   GAME LOGIC
+------------------------------------------------------------------*/
+function startGame(board){
+  if(!board || board.length < 3){ return; }
+  state.cases = buildCasesFromBoard(board);
+  state.heldCaseNum = null;
+  state.roundIndex = 0;
+  state.casesOpenedThisRound = 0;
+  state.currentOffer = 0;
+  state.dealAcceptedValue = null;
+  state.heldRevealed = false;
+  state.declinedOffers = [];
+  state.pendingOfferCases = null;
+  state.phase = 'pick';
+  render();
+}
+
+function pickCase(num){
+  state.heldCaseNum = num;
+  state.phase = 'playing';
+  render();
+}
+
+function openCase(num){
+  const c = state.cases.find(x=>x.num===num);
+  if(!c || c.opened) return;
+  c.opened = true;
+  state.casesOpenedThisRound++;
+
+  const remainingUnopened = state.cases.filter(x=>!x.opened && x.num!==state.heldCaseNum);
+
+  // Round complete?
+  if(state.casesOpenedThisRound >= ROUND_SCHEDULE[state.roundIndex]){
+    // If only 1 case remains besides held case, skip straight to final reveal (no more offers)
+    if(remainingUnopened.length <= 1){
+      state.phase = 'final';
+      render();
+      return;
+    }
+    triggerRing(remainingUnopened);
+    return;
+  }
+
+  render();
+}
+
+function triggerRing(remainingUnopened){
+  state.pendingOfferCases = remainingUnopened;
+  state.phase = 'ringing';
+  render();
+  setTimeout(()=>{
+    if(state.phase !== 'ringing') return; // player navigated away mid-ring
+    state.currentOffer = computeOffer(state.pendingOfferCases);
+    state.phase = 'offer';
+    render();
+  }, 2200);
+}
+
+function computeOffer(remainingUnopened){
+  const avg = remainingUnopened.reduce((s,c)=>s+c.value,0) / remainingUnopened.length;
+  const mult = ROUND_MULTIPLIER[Math.min(state.roundIndex, ROUND_MULTIPLIER.length-1)];
+  return Math.round((avg * mult) / 100) * 100;
+}
+
+function takeDeal(){
+  state.dealAcceptedValue = state.currentOffer;
+  state.phase = 'dealt';
+  render();
+}
+
+function declineDeal(){
+  state.declinedOffers.push({ round: state.roundIndex+1, offer: state.currentOffer });
+  state.roundIndex++;
+  state.casesOpenedThisRound = 0;
+
+  const remainingUnopened = state.cases.filter(x=>!x.opened && x.num!==state.heldCaseNum);
+  if(state.roundIndex >= ROUND_SCHEDULE.length || remainingUnopened.length <= 1){
+    state.phase = 'final';
+  } else {
+    state.phase = 'playing';
+  }
+  render();
+}
+
+/* ---------------------------------------------------------------
+   INIT
+------------------------------------------------------------------*/
+render();
+loadPresetIndex();
+</script>
+</body>
+</html>
