@@ -1685,7 +1685,7 @@ function renderSetupPanel(){
   const dailyBlockHtml = `
     <div class="preset-block daily-block">
       <h3>Daily Challenge</h3>
-      <p class="preset-hint" style="margin-bottom:12px;">One shared board for everyone today — your case order is still your own. Come back daily to build a streak.</p>
+      <p class="preset-hint" style="margin-bottom:12px;">One shared board for everyone today — your case order is still your own. Come back daily to build a streak, and your result counts toward My Lineup.</p>
       <div class="daily-row">
         <div class="daily-streak">
           <p class="daily-streak-value">${dailyState.streak}</p>
@@ -1950,13 +1950,18 @@ function renderFinalPanel(){
     lastOpen.opened = true;
     playSound('revealSting');
     celebrateIfBig(held.value);
-    saveResultToLineup({
-      player: held.player,
-      value: held.value,
-      accolade: getAccolade(held.player),
-      wasDeal: false
-    }, state.currentSport);
-    if(state.isDailyMode) markDailyCompleted();
+    // Lineup credit is Daily Challenge only — free play still works exactly
+    // the same, it just doesn't feed "My Lineup" anymore, so a saved lineup
+    // actually reflects daily results rather than unlimited cherry-picking.
+    if(state.isDailyMode){
+      saveResultToLineup({
+        player: held.player,
+        value: held.value,
+        accolade: getAccolade(held.player),
+        wasDeal: false
+      }, state.currentSport);
+      markDailyCompleted();
+    }
     renderLadder();
 
     const overlay = document.getElementById('finaleOverlay');
@@ -2034,7 +2039,7 @@ function renderLineupPanel(){
     el.innerHTML = `
       <div class="panel">
         <h2>My ${sport} Lineup</h2>
-        <p>No results saved yet — play a full round and your outcome (deal or final case) automatically gets added here. Your best ${size} results ever stay saved.</p>
+        <p>No results saved yet — complete a Daily Challenge and your outcome (deal or final case) automatically gets added here. Your best ${size} Daily Challenge results ever stay saved. Free play doesn't count toward your lineup.</p>
         <div class="panel-actions">
           <button class="primary" id="backFromLineupBtn">Back</button>
         </div>
@@ -2057,7 +2062,7 @@ function renderLineupPanel(){
   el.innerHTML = `
     <div class="panel">
       <h2>My ${sport} Lineup</h2>
-      <p>Your ${label} — the ${size} best results you've ever earned on this device playing ${sport} boards. A new result bumps out the weakest one automatically.</p>
+      <p>Your ${label} — the ${size} best Daily Challenge results you've ever earned playing ${sport} boards. A new result bumps out the weakest one automatically. Free play doesn't count toward this.</p>
       <div class="lineup-total">
         <p class="lineup-total-label">${label} Combined Value</p>
         <p class="lineup-total-value">${fmt(total)}</p>
@@ -2175,16 +2180,19 @@ function takeDeal(){
   render();
   openDealOverlay();
   celebrateIfBig(state.dealAcceptedValue);
-  const closestForLineup = findClosestPlayerByValue(state.cases, state.dealAcceptedValue);
-  if(closestForLineup){
-    saveResultToLineup({
-      player: closestForLineup.player,
-      value: state.dealAcceptedValue,
-      accolade: getAccolade(closestForLineup.player),
-      wasDeal: true
-    }, state.currentSport);
+  // Lineup credit is Daily Challenge only — see note in the final-reveal handler.
+  if(state.isDailyMode){
+    const closestForLineup = findClosestPlayerByValue(state.cases, state.dealAcceptedValue);
+    if(closestForLineup){
+      saveResultToLineup({
+        player: closestForLineup.player,
+        value: state.dealAcceptedValue,
+        accolade: getAccolade(closestForLineup.player),
+        wasDeal: true
+      }, state.currentSport);
+    }
+    markDailyCompleted();
   }
-  if(state.isDailyMode) markDailyCompleted();
 }
 
 function openDealOverlay(){
