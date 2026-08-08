@@ -488,6 +488,14 @@
     color:var(--brass);
     margin:8px 0 0;
   }
+  .deal-equivalent{
+    font-size:14px;
+    color:var(--cream-dim);
+    margin:14px 0 0;
+    padding-top:14px;
+    border-top:1px solid var(--line);
+  }
+  .deal-equivalent strong{color:var(--brass-bright);font-weight:600;}
   @keyframes heroPop{
     0%{opacity:0;transform:scale(0.88);}
     100%{opacity:1;transform:scale(1);}
@@ -839,6 +847,19 @@ function getAccolade(name){
    just any high-value case that happens to appear on the board.
 ------------------------------------------------------------------*/
 const BIG_WIN_THRESHOLD = 500000;
+
+function findClosestPlayerByValue(cases, dealValue){
+  // "Rounds down" to the highest case value that's <= the deal amount,
+  // so a $457,000 offer maps to whichever player sits at $450,000 on
+  // this board — never a player worth more than the actual deal.
+  const sorted = [...cases].sort((a, b) => a.value - b.value);
+  let match = sorted[0];
+  for(const c of sorted){
+    if(c.value <= dealValue) match = c;
+    else break;
+  }
+  return match;
+}
 
 function celebrateIfBig(value){
   if(value < BIG_WIN_THRESHOLD) return;
@@ -1788,8 +1809,10 @@ function openDealOverlay(){
   const held = state.cases.find(c=>c.num===state.heldCaseNum);
   const overlay = document.getElementById('finaleOverlay');
   const inner = document.getElementById('finaleOverlayInner');
+  const closest = findClosestPlayerByValue(state.cases, state.dealAcceptedValue);
   const dealtShareText = buildShareText({
-    resultLine: `I took the deal in The Vault and banked ${fmt(state.dealAcceptedValue)}!`
+    resultLine: `I took the deal in The Vault and banked ${fmt(state.dealAcceptedValue)}!`,
+    passedLine: closest ? `That's about ${closest.player} money (${fmt(closest.value)}).` : ''
   });
   const historyRows = state.declinedOffers.map(d =>
     `<li><span class="round-tag">Round ${d.round}</span> <strong>${fmt(d.offer)}</strong></li>`
@@ -1797,18 +1820,19 @@ function openDealOverlay(){
   const imagePayload = {
     mode: 'deal',
     dealAmount: fmt(state.dealAcceptedValue),
-    caseLabel: `Case #${held.num} stays sealed`,
+    caseLabel: closest ? `That's ${closest.player} money` : `Case #${held.num} stays sealed`,
     revealedPlayer: null, revealedValue: null
   };
 
   inner.innerHTML = `
     <p class="finale-eyebrow">The Vault</p>
-    <p class="finale-title">Deal!</p>
+    <p class="finale-title">DEAL!</p>
     <div class="hero-reveal-wrap" id="dealHeroWrap">
       <div class="hero-reveal is-yours">
         <p class="hero-tag">You banked</p>
         <p class="hero-value">${fmt(state.dealAcceptedValue)}</p>
         <p class="hero-player">Case #${held.num} stays sealed</p>
+        ${closest ? `<p class="deal-equivalent">That's about <strong>${closest.player}</strong> money (${fmt(closest.value)})</p>` : ''}
       </div>
     </div>
     <div class="panel-actions" style="justify-content:center;">
