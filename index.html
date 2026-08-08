@@ -1171,6 +1171,15 @@ function renderHeaderActions(){
   if(state.phase === 'setup'){
     return; // actions live inside setup panel
   }
+  const soundBtn = document.createElement('button');
+  soundBtn.textContent = state.soundEnabled ? '🔊 Sound: On' : '🔇 Sound: Off';
+  soundBtn.onclick = () => {
+    state.soundEnabled = !state.soundEnabled;
+    if(state.soundEnabled) playSound('caseClick'); // confirmation blip
+    renderHeaderActions();
+  };
+  el.appendChild(soundBtn);
+
   const editBtn = document.createElement('button');
   editBtn.textContent = 'Edit board';
   editBtn.onclick = () => { state.phase = 'setup'; render(); };
