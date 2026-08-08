@@ -1108,6 +1108,16 @@ async function doCopy(text, btnEl){
   setTimeout(() => { btnEl.textContent = originalLabel; }, 2000);
 }
 
+function scrollToFinalReveal(){
+  // The "open your case" button renders after the full board grid, so on
+  // mobile it's easy to miss below a screen of already-opened cases —
+  // this brings it into view automatically the moment it appears.
+  setTimeout(() => {
+    const stage = document.querySelector('.final-open-stage');
+    if(stage) stage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 50);
+}
+
 function goHome(){
   state.phase = 'setup';
   render();
@@ -1570,6 +1580,7 @@ function openCase(num){
     if(remainingUnopened.length <= 1){
       state.phase = 'final';
       render();
+      scrollToFinalReveal();
       return;
     }
     triggerRing(remainingUnopened);
@@ -1687,6 +1698,7 @@ function declineDeal(){
     state.phase = 'playing';
   }
   render();
+  if(state.phase === 'final') scrollToFinalReveal();
 }
 
 /* ---------------------------------------------------------------
