@@ -761,6 +761,35 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ---------------------------------------------------------------
+   SOUND EFFECTS
+   Expects three audio files in /sounds/ alongside index.html:
+     /sounds/case-click.mp3   — plays when a case is opened
+     /sounds/banker-ring.mp3  — plays when the banker calls
+     /sounds/reveal-sting.mp3 — plays on the final case reveal
+   If a file is missing, playback just fails silently — nothing
+   breaks. Drop matching-named files into the repo and sound works
+   immediately with no further code changes.
+------------------------------------------------------------------*/
+const SOUNDS = {
+  caseClick: new Audio('sounds/case-click.mp3'),
+  bankerRing: new Audio('sounds/banker-ring.mp3'),
+  revealSting: new Audio('sounds/reveal-sting.mp3'),
+};
+Object.values(SOUNDS).forEach(a => { a.preload = 'auto'; });
+
+function playSound(name){
+  const base = SOUNDS[name];
+  if(!base) return;
+  try{
+    // Clone so rapid repeat plays (e.g. quick case clicks) don't cut each other off.
+    const instance = base.cloneNode();
+    instance.volume = 0.6;
+    instance.play().catch(() => { /* file missing or autoplay blocked — ignore */ });
+  } catch(e){ /* ignore */ }
+}
+
+
+/* ---------------------------------------------------------------
    ADMIN AUTH — sign-in gate for editing/saving/deleting boards.
    Anyone can load and play saved boards; only signed-in admins
    (accounts you create manually in Supabase Auth) can edit them.
@@ -1281,6 +1310,7 @@ function renderSetupPanel(){
   const authBlockHtml = isAdmin ? `
     <div class="preset-block">
       <p class="preset-hint" style="margin-bottom:10px;">Signed in as <strong style="color:var(--cream)">${currentUser.email}</strong></p>
+      <p class="preset-hint" id="playCountLine" style="margin-bottom:10px;">Loading play count…</p>
       <button id="signOutBtn">Sign out</button>
     </div>
   ` : (showAdminGate ? `
@@ -1346,6 +1376,7 @@ function renderSetupPanel(){
       render();
     };
     document.getElementById('signOutBtn').onclick = async () => { await adminSignOut(); };
+    loadPlayCount();
   } else if(showAdminGate) {
     document.getElementById('adminSignInBtn').onclick = async () => {
       const email = document.getElementById('adminEmail').value.trim();
@@ -1478,6 +1509,7 @@ function renderFinalPanel(){
   document.getElementById('finalRevealBtn').onclick = () => {
     state.heldRevealed = true;
     lastOpen.opened = true;
+    playSound('revealSting');
     renderLadder();
 
     const overlay = document.getElementById('finaleOverlay');
@@ -1557,6 +1589,24 @@ function startGame(board){
   state.lastOpenedCase = null;
   state.phase = 'pick';
   render();
+  logPlay();
+}
+
+async function logPlay(){
+  // Fire-and-forget usage counter — never blocks or breaks gameplay if it fails.
+  try{ await sb.from('vault_plays').insert({}); } catch(e){ /* silently ignore */ }
+}
+
+async function loadPlayCount(){
+  const line = document.getElementById('playCountLine');
+  if(!line) return;
+  try{
+    const { count, error } = await sb.from('vault_plays').select('*', { count: 'exact', head: true });
+    if(error) throw error;
+    line.textContent = `${count.toLocaleString('en-US')} game${count === 1 ? '' : 's'} played all-time`;
+  } catch(e){
+    line.textContent = 'Could not load play count.';
+  }
 }
 
 function pickCase(num){
@@ -1569,6 +1619,7 @@ function openCase(num){
   const c = state.cases.find(x=>x.num===num);
   if(!c || c.opened) return;
   c.opened = true;
+  playSound('caseClick');
   state.lastOpenedCase = { player: c.player, value: c.value };
   state.casesOpenedThisRound++;
 
@@ -1594,6 +1645,7 @@ function triggerRing(remainingUnopened){
   state.pendingOfferCases = remainingUnopened;
   state.phase = 'ringing';
   render();
+  playSound('bankerRing');
   setTimeout(()=>{
     if(state.phase !== 'ringing') return; // player navigated away mid-ring
     state.currentOffer = computeOffer(state.pendingOfferCases);
@@ -1673,6 +1725,7 @@ function openDealOverlay(){
   }
   document.getElementById('revealHeldBtnOverlay').onclick = (e) => {
     state.heldRevealed = true;
+    playSound('revealSting');
     imagePayload.revealedPlayer = held.player;
     imagePayload.revealedValue = fmt(held.value);
     document.getElementById('dealHeroWrap').insertAdjacentHTML('beforeend', `
