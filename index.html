@@ -1193,6 +1193,7 @@ async function startDailyChallenge(){
   }
   state.currentSport = daily.sport;
   state.editBoard = daily.board; // so "Play again" continues with this same board, not whatever was set before
+  state.selectedPreset = daily.presetName; // so the active board name displays correctly during play
   markDailyStarted();
   startGame(daily.board);
   state.isDailyMode = true; // set after startGame(), which resets other per-game flags
@@ -1715,6 +1716,10 @@ function renderStatusStrip(){
       <span class="status-label">Mode</span>
       <span class="status-value" style="color:var(--brass-bright);">🔥 Daily Challenge</span>
     </div>` : ''}
+    <div class="status-block">
+      <span class="status-label">Board</span>
+      <span class="status-value">${state.selectedPreset || 'Custom board'}</span>
+    </div>
     <div class="status-block">
       <span class="status-label">Status</span>
       <span class="status-value">${roundLabel}</span>
